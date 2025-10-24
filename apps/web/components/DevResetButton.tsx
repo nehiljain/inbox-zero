@@ -63,12 +63,10 @@ export function DevResetButton({ isAdmin }: { isAdmin: boolean }) {
   });
 
   // Only show in local development environment or for admin users
-  // Check for local development by looking at the database URL or environment
+  // Use client-safe checks: NODE_ENV and window.location
   const isLocalDev =
     process.env.NODE_ENV === "development" &&
-    (process.env.DATABASE_URL?.includes("localhost") ||
-      process.env.DATABASE_URL?.includes("inbox_zero_local") ||
-      process.env.NEXT_PUBLIC_BASE_URL?.includes("localhost"));
+    (typeof window !== "undefined" && window.location.hostname === "localhost");
 
   if (!isLocalDev && !isAdmin) {
     return null;
