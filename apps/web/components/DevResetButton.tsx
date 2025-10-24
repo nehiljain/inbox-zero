@@ -18,13 +18,15 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import {
   devDeleteAccountAction,
   devResetOnboardingAction,
 } from "@/utils/actions/dev-helpers";
 import { useRouter } from "next/navigation";
-import { RotateCcw, ChevronDown } from "lucide-react";
+import { RotateCcw, ChevronDown, Settings } from "lucide-react";
+import Link from "next/link";
 
 export function DevResetButton({ isAdmin }: { isAdmin: boolean }) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -88,6 +90,15 @@ export function DevResetButton({ isAdmin }: { isAdmin: boolean }) {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56">
+          {isAdmin && (
+            <DropdownMenuItem asChild>
+              <Link href="/admin">
+                <Settings className="size-4 mr-2" />
+                Admin Panel
+              </Link>
+            </DropdownMenuItem>
+          )}
+          {isAdmin && <DropdownMenuSeparator />}
           <DropdownMenuItem onClick={() => setShowOnboardingDialog(true)}>
             <RotateCcw className="size-4 mr-2" />
             Reset Onboarding
