@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/utils/auth";
-import { env } from "@/env";
 import prisma from "@/utils/prisma";
 
 export default async function WelcomeRedirectPage(props: {
@@ -18,8 +17,7 @@ export default async function WelcomeRedirectPage(props: {
 
   if (!user) redirect("/login");
 
-  if (!searchParams.force && user.completedOnboardingAt)
-    redirect(env.NEXT_PUBLIC_APP_HOME_PATH);
+  if (!searchParams.force && user.completedOnboardingAt) redirect("/setup");
 
   // Redirect to value prop page for users who haven't completed onboarding
   // Note: We show value prop even without PostHog configured for dev testing
