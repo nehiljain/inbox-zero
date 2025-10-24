@@ -59,6 +59,8 @@ import { ReferralDialog } from "@/components/ReferralDialog";
 import { isGoogleProvider } from "@/utils/email/provider-types";
 import { NavUser } from "@/components/NavUser";
 import { PremiumExpiredCard } from "@/components/PremiumExpiredCard";
+import { useSession } from "@/utils/auth-client";
+import { isAdmin } from "@/utils/admin";
 
 type NavItem = {
   name: string;
@@ -73,7 +75,11 @@ export const useNavigation = () => {
   // When we have features in early access, we can filter the navigation items
   const showCleaner = useCleanerEnabled();
   const { emailAccountId, emailAccount, provider } = useAccount();
+  const { data: session } = useSession();
   const currentEmailAccountId = emailAccount?.id || emailAccountId;
+
+  // Check if user is admin
+  const userIsAdmin = isAdmin({ email: session?.user?.email });
 
   // Assistant category items
   const navItems: NavItem[] = useMemo(
@@ -107,8 +113,18 @@ export const useNavigation = () => {
         href: prefixPath(currentEmailAccountId, "/calendars"),
         icon: CalendarIcon,
       },
+      // Add admin link for admin users
+      ...(userIsAdmin
+        ? [
+            {
+              name: "Admin",
+              href: "/admin",
+              icon: SettingsIcon,
+            },
+          ]
+        : []),
     ],
-    [currentEmailAccountId, provider],
+    [currentEmailAccountId, provider, userIsAdmin],
   );
 
   const navItemsFiltered = useMemo(
