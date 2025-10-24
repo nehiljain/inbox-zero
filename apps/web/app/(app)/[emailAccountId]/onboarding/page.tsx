@@ -12,8 +12,6 @@ export const metadata: Metadata = {
   alternates: { canonical: "/onboarding" },
 };
 
-export const dynamic = "force-dynamic";
-
 export default async function OnboardingPage(props: {
   params: Promise<{ emailAccountId: string }>;
   searchParams: Promise<{ step?: string; force?: string }>;
