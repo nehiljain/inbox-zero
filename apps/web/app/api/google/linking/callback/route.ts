@@ -43,7 +43,7 @@ export const GET = withError(async (request) => {
 
   response.cookies.delete(GOOGLE_LINKING_STATE_COOKIE_NAME);
 
-  const { userId: targetUserId } = decodedState;
+  const { userId: targetUserId, intent } = decodedState;
 
   if (!code) {
     logger.warn("Missing code in Google linking callback");
@@ -55,13 +55,17 @@ export const GET = withError(async (request) => {
 
   try {
     const { tokens } = await googleAuth.getToken(code);
-    const { id_token } = tokens;
+    const { id_token, access_token, refresh_token, expiry_date } = tokens;
 
     if (!id_token) {
       throw new Error("Missing id_token from Google response");
     }
 
-    let payload: any;
+    let payload: {
+      sub?: string;
+      email?: string;
+      [key: string]: unknown;
+    };
     try {
       const ticket = await googleAuth.verifyIdToken({
         idToken: id_token,
@@ -71,10 +75,17 @@ export const GET = withError(async (request) => {
       if (!verifiedPayload) {
         throw new Error("Could not get payload from verified ID token ticket.");
       }
-      payload = verifiedPayload;
-    } catch (err: any) {
-      logger.error("ID token verification failed using googleAuth:", err);
-      throw new Error(`ID token verification failed: ${err.message}`);
+      payload = verifiedPayload as unknown as {
+        [key: string]: unknown;
+        sub?: string;
+        email?: string;
+      };
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : "Unknown error";
+      logger.error("ID token verification failed using googleAuth:", {
+        error: errorMessage,
+      });
+      throw new Error(`ID token verification failed: ${errorMessage}`);
     }
 
     const providerAccountId = payload.sub;
@@ -84,6 +95,68 @@ export const GET = withError(async (request) => {
       throw new Error(
         "ID token missing required subject (sub) or email claim.",
       );
+    }
+
+    // Handle Gmail onboarding case
+    if (intent === "gmail") {
+      // Check if Gmail is already connected for this user to prevent duplicate processing
+      const existingEmailAccount = await prisma.emailAccount.findFirst({
+        where: {
+          userId: targetUserId,
+          account: {
+            refresh_token: { not: null },
+          },
+        },
+        select: { id: true, account: { select: { refresh_token: true } } },
+      });
+
+      if (existingEmailAccount?.account?.refresh_token) {
+        logger.info(
+          "Gmail already connected for user, redirecting to teaser screen",
+          {
+            userId: targetUserId,
+          },
+        );
+        const teaserUrl = new URL("/ready-for-brief", request.nextUrl.origin);
+        return NextResponse.redirect(teaserUrl, { headers: response.headers });
+      }
+
+      // For Gmail onboarding, we need to update the existing account with Gmail permissions
+      const emailAccount = await prisma.emailAccount.findFirst({
+        where: { userId: targetUserId },
+        select: { accountId: true },
+      });
+
+      if (emailAccount) {
+        await prisma.account.update({
+          where: { id: emailAccount.accountId },
+          data: {
+            access_token,
+            refresh_token,
+            expires_at: expiry_date ? new Date(expiry_date) : null,
+          },
+        });
+
+        logger.info("Gmail connected successfully during onboarding", {
+          userId: targetUserId,
+          googleEmail: providerEmail,
+        });
+
+        // Redirect to teaser screen
+        const teaserUrl = new URL("/ready-for-brief", request.nextUrl.origin);
+        logger.info("Redirecting to teaser screen", {
+          teaserUrl: teaserUrl.toString(),
+        });
+        return NextResponse.redirect(teaserUrl, { headers: response.headers });
+      } else {
+        logger.warn("No email account found for Gmail onboarding", {
+          userId: targetUserId,
+        });
+        redirectUrl.searchParams.set("error", "no_email_account");
+        return NextResponse.redirect(redirectUrl, {
+          headers: response.headers,
+        });
+      }
     }
 
     const existingAccount = await prisma.account.findUnique({
@@ -167,22 +240,61 @@ export const GET = withError(async (request) => {
     return NextResponse.redirect(redirectUrl, {
       headers: response.headers,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error("Error in Google linking callback:", { error });
+
+    // Handle invalid_grant error specifically for Gmail onboarding
+    if (
+      error instanceof Error &&
+      error.message?.includes("invalid_grant") &&
+      intent === "gmail"
+    ) {
+      logger.info(
+        "Invalid grant error for Gmail onboarding - likely duplicate request, checking if already connected",
+        {
+          userId: targetUserId,
+        },
+      );
+
+      // Check if Gmail is already connected for this user
+      const existingEmailAccount = await prisma.emailAccount.findFirst({
+        where: {
+          userId: targetUserId,
+          account: {
+            refresh_token: { not: null },
+          },
+        },
+        select: { id: true, account: { select: { refresh_token: true } } },
+      });
+
+      if (existingEmailAccount?.account?.refresh_token) {
+        logger.info(
+          "Gmail already connected for user, redirecting to teaser screen despite invalid_grant",
+          {
+            userId: targetUserId,
+          },
+        );
+        const teaserUrl = new URL("/ready-for-brief", request.nextUrl.origin);
+        return NextResponse.redirect(teaserUrl, { headers: response.headers });
+      }
+    }
+
     let errorCode = "link_failed";
-    if (error.message?.includes("ID token verification failed")) {
-      errorCode = "invalid_id_token";
-    } else if (error.message?.includes("Missing id_token")) {
-      errorCode = "missing_id_token";
-    } else if (error.message?.includes("ID token missing required")) {
-      errorCode = "incomplete_id_token";
-    } else if (error.message?.includes("Missing access_token")) {
-      errorCode = "token_exchange_failed";
+    if (error instanceof Error) {
+      if (error.message?.includes("ID token verification failed")) {
+        errorCode = "invalid_id_token";
+      } else if (error.message?.includes("Missing id_token")) {
+        errorCode = "missing_id_token";
+      } else if (error.message?.includes("ID token missing required")) {
+        errorCode = "incomplete_id_token";
+      } else if (error.message?.includes("Missing access_token")) {
+        errorCode = "token_exchange_failed";
+      }
     }
     redirectUrl.searchParams.set("error", errorCode);
     redirectUrl.searchParams.set(
       "error_description",
-      error.message || "Unknown error",
+      error instanceof Error ? error.message : "Unknown error",
     );
     response.cookies.delete(GOOGLE_LINKING_STATE_COOKIE_NAME);
     return NextResponse.redirect(redirectUrl, { headers: response.headers });

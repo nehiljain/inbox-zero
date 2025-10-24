@@ -5,14 +5,14 @@ const renderLink = ({
   attributes,
   content,
 }: {
-  attributes: any;
-  content: any;
+  attributes: Record<string, unknown>;
+  content: string;
 }) => {
   const { href, ...props } = attributes;
 
   return (
     <Link
-      href={href}
+      href={href as string}
       {...props}
       target="_blank"
       className="font-semibold hover:underline"

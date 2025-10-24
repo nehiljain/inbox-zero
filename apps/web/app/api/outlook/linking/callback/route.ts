@@ -252,20 +252,21 @@ export const GET = withError(async (request) => {
     return NextResponse.redirect(redirectUrl, {
       headers: response.headers,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
     logger.error("Error in Outlook linking callback:", { error });
     let errorCode = "link_failed";
-    if (error.message?.includes("Failed to exchange code")) {
+    if (errorMessage?.includes("Failed to exchange code")) {
       errorCode = "token_exchange_failed";
-    } else if (error.message?.includes("Failed to fetch user profile")) {
+    } else if (errorMessage?.includes("Failed to fetch user profile")) {
       errorCode = "profile_fetch_failed";
-    } else if (error.message?.includes("Profile missing required")) {
+    } else if (errorMessage?.includes("Profile missing required")) {
       errorCode = "incomplete_profile";
     }
     redirectUrl.searchParams.set("error", errorCode);
     redirectUrl.searchParams.set(
       "error_description",
-      error.message || "Unknown error",
+      error instanceof Error ? error.message : "Unknown error",
     );
     response.cookies.delete(OUTLOOK_LINKING_STATE_COOKIE_NAME);
     return NextResponse.redirect(redirectUrl, { headers: response.headers });

@@ -101,7 +101,7 @@ function ModelSectionForm(props: {
     [refetchUser],
   );
 
-  const globalError = (errors as any)[""];
+  const globalError = (errors as Record<string, unknown>)[""];
 
   const modelSelectOptions =
     aiProvider === Provider.OPEN_AI && watch("aiApiKey")
@@ -149,8 +149,8 @@ function ModelSectionForm(props: {
         </>
       )}
 
-      {globalError && (
-        <AlertError title="Error saving" description={globalError.message} />
+      {!!globalError && (
+        <AlertError title="Error saving" description={String(globalError)} />
       )}
 
       {watch("aiProvider") === Provider.OPEN_AI &&

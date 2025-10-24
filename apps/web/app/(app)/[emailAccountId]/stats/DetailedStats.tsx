@@ -44,9 +44,20 @@ export function DetailedStats(props: {
   const { data, isLoading, error } = useSWR<
     StatsByWeekResponse,
     { error: string }
-  >(`/api/user/stats/by-period?${new URLSearchParams(params as any)}`, {
-    refreshInterval: props.refreshInterval,
-  });
+  >(
+    `/api/user/stats/by-period?${new URLSearchParams({
+      period,
+      ...Object.fromEntries(
+        Object.entries(getDateRangeParams(dateRange)).map(([key, value]) => [
+          key,
+          value?.toString() ?? "",
+        ]),
+      ),
+    })}`,
+    {
+      refreshInterval: props.refreshInterval,
+    },
+  );
 
   return (
     <LoadingContent
