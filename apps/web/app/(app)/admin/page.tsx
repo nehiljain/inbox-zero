@@ -10,8 +10,7 @@ import {
 } from "@/app/(app)/admin/AdminSyncStripe";
 import { RegisterSSOModal } from "@/app/(app)/admin/RegisterSSOModal";
 
-// NOTE: Free tier limit is 300 seconds max duration
-export const maxDuration = 300;
+export const dynamic = "force-dynamic";
 
 export default async function AdminPage() {
   const session = await auth();

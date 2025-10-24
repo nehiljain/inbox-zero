@@ -2,6 +2,8 @@ import { auth } from "@/utils/auth";
 import { redirect } from "next/navigation";
 import prisma from "@/utils/prisma";
 
+export const dynamic = "force-dynamic";
+
 export default async function OrganizationPage({
   params,
 }: {
