@@ -33,6 +33,8 @@ import {
   dayOfWeekToBitmask,
   bitmaskToDayOfWeek,
 } from "@/utils/schedule";
+import { Trash2, Plus } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
 const digestSettingsSchema = z.object({
   selectedItems: z.set(z.string()),
@@ -73,14 +75,20 @@ export function DigestSettingsForm() {
     isLoading: digestLoading,
     error: digestError,
     mutate: mutateDigestSettings,
-  } = useSWR<GetDigestSettingsResponse>("/api/user/digest-settings");
+  } = useSWR<GetDigestSettingsResponse>("/api/user/digest-settings", {
+    revalidateOnMount: true, // Always fetch fresh data when component mounts
+    revalidateOnFocus: false,
+  });
 
   const {
     data: scheduleData,
     isLoading: scheduleLoading,
     error: scheduleError,
     mutate: mutateSchedule,
-  } = useSWR<GetDigestScheduleResponse>("/api/user/digest-schedule");
+  } = useSWR<GetDigestScheduleResponse>("/api/user/digest-schedule", {
+    revalidateOnMount: true, // Always fetch fresh data when component mounts
+    revalidateOnFocus: false,
+  });
 
   const isLoading = rulesLoading || digestLoading || scheduleLoading;
   const error = rulesError || digestError || scheduleError;
@@ -88,6 +96,55 @@ export function DigestSettingsForm() {
   const [selectedDigestItems, setSelectedDigestItems] = useState<Set<string>>(
     new Set(),
   );
+  const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  const [showAddScheduleForm, setShowAddScheduleForm] = useState(false);
+
+  const schedules = Array.isArray(scheduleData) ? scheduleData : [];
+
+  // Format time in user's local timezone
+  const formatScheduleTime = (timeOfDay: Date | null | undefined) => {
+    if (!timeOfDay) return "Not set";
+    const date = new Date(timeOfDay);
+    const hours = date.getHours();
+    const minutes = date.getMinutes();
+    const ampm = hours >= 12 ? "PM" : "AM";
+    const displayHour = hours % 12 || 12;
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const tzAbbr = new Date()
+      .toLocaleTimeString("en-US", {
+        timeZone: timezone,
+        timeZoneName: "short",
+      })
+      .split(" ")
+      .pop();
+
+    return `${displayHour}:${minutes.toString().padStart(2, "0")} ${ampm} ${tzAbbr}`;
+  };
+
+  const deleteSchedule = async (scheduleId: string) => {
+    setIsDeleting(scheduleId);
+    try {
+      const response = await fetch(`/api/user/digest-schedule/${scheduleId}`, {
+        method: "DELETE",
+        headers: {
+          "X-Email-Account-ID": emailAccountId,
+        },
+      });
+
+      if (response.ok) {
+        toastSuccess({ description: "Schedule deleted successfully" });
+        mutateSchedule();
+      } else {
+        toastError({ description: "Failed to delete schedule" });
+      }
+    } catch (error) {
+      toastError({
+        description: "An error occurred while deleting the schedule",
+      });
+    } finally {
+      setIsDeleting(null);
+    }
+  };
 
   const {
     handleSubmit,
@@ -140,12 +197,16 @@ export function DigestSettingsForm() {
 
   // Initialize selected items and form data from API responses
   useEffect(() => {
-    if (rules && digestSettings && scheduleData) {
+    // We need rules and digestSettings, but scheduleData can be null (user hasn't set up schedule yet)
+    if (rules && digestSettings) {
       const selectedItems = new Set<string>();
 
       // Add rules that have digest actions
       rules.forEach((rule) => {
-        if (rule.actions.some((action) => action.type === ActionType.DIGEST)) {
+        const hasDigest = rule.actions.some(
+          (action) => action.type === ActionType.DIGEST,
+        );
+        if (hasDigest) {
           selectedItems.add(rule.id);
         }
       });
@@ -157,8 +218,15 @@ export function DigestSettingsForm() {
 
       setSelectedDigestItems(selectedItems);
 
-      // Initialize schedule form data
-      const initialScheduleProps = getInitialScheduleProps(scheduleData);
+      // Initialize schedule form data (use defaults if scheduleData is null)
+      const initialScheduleProps = scheduleData
+        ? getInitialScheduleProps(scheduleData)
+        : {
+            schedule: "daily",
+            dayOfWeek: "1",
+            time: "09:00",
+          };
+
       reset({
         selectedItems,
         ...initialScheduleProps,
@@ -194,40 +262,56 @@ export function DigestSettingsForm() {
         coldEmailDigest,
       };
 
-      // Handle schedule update
-      const { schedule, dayOfWeek, time } = data;
-
-      let intervalDays: number;
-      switch (schedule) {
-        case "daily":
-          intervalDays = 1;
-          break;
-        case "weekly":
-          intervalDays = 7;
-          break;
-        default:
-          intervalDays = 1;
-      }
-
-      const [hourStr, minuteStr] = time.split(":");
-      const hour24 = Number.parseInt(hourStr, 10);
-      const minute = Number.parseInt(minuteStr, 10);
-
-      const timeOfDay = createCanonicalTimeOfDay(hour24, minute);
-
-      const scheduleUpdateData = {
-        intervalDays,
-        occurrences: 1,
-        daysOfWeek: dayOfWeekToBitmask(Number.parseInt(dayOfWeek, 10)),
-        timeOfDay,
-      };
-
-      // Execute both updates
+      // Execute items update
       try {
-        await Promise.all([
-          executeItems(itemsData),
-          executeSchedule(scheduleUpdateData),
-        ]);
+        await executeItems(itemsData);
+
+        // Handle schedule creation (only if form is visible and being submitted)
+        if (showAddScheduleForm || schedules.length === 0) {
+          const { schedule, dayOfWeek, time } = data;
+
+          let intervalDays: number;
+          switch (schedule) {
+            case "daily":
+              intervalDays = 1;
+              break;
+            case "weekly":
+              intervalDays = 7;
+              break;
+            default:
+              intervalDays = 1;
+          }
+
+          const [hourStr, minuteStr] = time.split(":");
+          const hour24 = Number.parseInt(hourStr, 10);
+          const minute = Number.parseInt(minuteStr, 10);
+
+          const timeOfDay = createCanonicalTimeOfDay(hour24, minute);
+
+          const scheduleCreateData = {
+            intervalDays,
+            occurrences: 1,
+            daysOfWeek: dayOfWeekToBitmask(Number.parseInt(dayOfWeek, 10)),
+            timeOfDay: timeOfDay.toISOString(),
+          };
+
+          const response = await fetch("/api/user/digest-schedule", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Email-Account-ID": emailAccountId,
+            },
+            body: JSON.stringify(scheduleCreateData),
+          });
+
+          if (!response.ok) {
+            throw new Error("Failed to create schedule");
+          }
+
+          mutateSchedule();
+          setShowAddScheduleForm(false);
+        }
+
         toastSuccess({
           description: "Your digest settings have been updated!",
         });
@@ -238,7 +322,14 @@ export function DigestSettingsForm() {
         });
       }
     },
-    [rules, executeItems, executeSchedule],
+    [
+      rules,
+      executeItems,
+      executeSchedule,
+      showAddScheduleForm,
+      schedules.length,
+      mutateSchedule,
+    ],
   );
 
   // Create options for MultiSelectFilter
@@ -278,62 +369,118 @@ export function DigestSettingsForm() {
             <div>
               <Label>Send the digest email</Label>
 
-              <div className="grid lg:grid-cols-3 gap-3 mt-3">
-                <FormItem>
-                  <Label htmlFor="frequency-select">Every</Label>
-                  <Select
-                    value={watchedValues.schedule}
-                    onValueChange={(val) => setValue("schedule", val)}
-                  >
-                    <SelectTrigger id="frequency-select">
-                      {watchedValues.schedule
-                        ? frequencies.find(
-                            (f) => f.value === watchedValues.schedule,
-                          )?.label
-                        : "Select..."}
-                    </SelectTrigger>
-                    <SelectContent>
-                      {frequencies.map((f) => (
-                        <SelectItem key={f.value} value={f.value}>
-                          {f.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </FormItem>
-
-                {watchedValues.schedule !== "daily" && (
-                  <FormItem>
-                    <Label htmlFor="dayofweek-select">on</Label>
-                    <Select
-                      value={watchedValues.dayOfWeek}
-                      onValueChange={(val) => setValue("dayOfWeek", val)}
+              {/* Existing Schedules */}
+              {schedules.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  {schedules.map((schedule) => (
+                    <div
+                      key={schedule.id}
+                      className="flex items-center justify-between p-3 border rounded-md bg-gray-50"
                     >
-                      <SelectTrigger id="dayofweek-select">
-                        {watchedValues.dayOfWeek
-                          ? daysOfWeek.find(
-                              (d) => d.value === watchedValues.dayOfWeek,
-                            )?.label
-                          : "Select..."}
-                      </SelectTrigger>
-                      <SelectContent>
-                        {daysOfWeek.map((d) => (
-                          <SelectItem key={d.value} value={d.value}>
-                            {d.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </FormItem>
-                )}
+                      <div className="flex items-center gap-3">
+                        <Badge variant="outline">Daily</Badge>
+                        <span className="font-medium">
+                          {formatScheduleTime(schedule.timeOfDay)}
+                        </span>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => deleteSchedule(schedule.id)}
+                        disabled={isDeleting === schedule.id}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
 
-                <TimePicker
-                  id="time-picker"
-                  label="at"
-                  value={watchedValues.time}
-                  onChange={(value) => setValue("time", value)}
-                />
-              </div>
+              {/* Add Schedule Button */}
+              {!showAddScheduleForm && schedules.length > 0 && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowAddScheduleForm(true)}
+                  className="w-full mt-3"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Schedule Time
+                </Button>
+              )}
+
+              {/* Schedule Form (show if adding or no schedules exist) */}
+              {(showAddScheduleForm || schedules.length === 0) && (
+                <>
+                  <div className="grid lg:grid-cols-3 gap-3 mt-3">
+                    <FormItem>
+                      <Label htmlFor="frequency-select">Every</Label>
+                      <Select
+                        value={watchedValues.schedule}
+                        onValueChange={(val) => setValue("schedule", val)}
+                      >
+                        <SelectTrigger id="frequency-select">
+                          {watchedValues.schedule
+                            ? frequencies.find(
+                                (f) => f.value === watchedValues.schedule,
+                              )?.label
+                            : "Select..."}
+                        </SelectTrigger>
+                        <SelectContent>
+                          {frequencies.map((f) => (
+                            <SelectItem key={f.value} value={f.value}>
+                              {f.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </FormItem>
+
+                    {watchedValues.schedule !== "daily" && (
+                      <FormItem>
+                        <Label htmlFor="dayofweek-select">on</Label>
+                        <Select
+                          value={watchedValues.dayOfWeek}
+                          onValueChange={(val) => setValue("dayOfWeek", val)}
+                        >
+                          <SelectTrigger id="dayofweek-select">
+                            {watchedValues.dayOfWeek
+                              ? daysOfWeek.find(
+                                  (d) => d.value === watchedValues.dayOfWeek,
+                                )?.label
+                              : "Select..."}
+                          </SelectTrigger>
+                          <SelectContent>
+                            {daysOfWeek.map((d) => (
+                              <SelectItem key={d.value} value={d.value}>
+                                {d.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </FormItem>
+                    )}
+
+                    <TimePicker
+                      id="time-picker"
+                      label="at"
+                      value={watchedValues.time}
+                      onChange={(value) => setValue("time", value)}
+                    />
+                  </div>
+                  {showAddScheduleForm && schedules.length > 0 && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setShowAddScheduleForm(false)}
+                      className="mt-3"
+                    >
+                      Cancel
+                    </Button>
+                  )}
+                </>
+              )}
             </div>
 
             <Button type="submit" loading={isSubmitting} className="mt-4">
@@ -394,8 +541,14 @@ function EmailPreview({
 }
 
 function getInitialScheduleProps(
-  digestSchedule?: GetDigestScheduleResponse | null,
+  digestSchedules?: GetDigestScheduleResponse | null,
 ) {
+  // Use the first schedule if multiple exist
+  const digestSchedule =
+    Array.isArray(digestSchedules) && digestSchedules.length > 0
+      ? digestSchedules[0]
+      : null;
+
   const initialSchedule = (() => {
     if (!digestSchedule) return "daily";
     switch (digestSchedule.intervalDays) {

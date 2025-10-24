@@ -4,5 +4,9 @@ import { useSWRWithEmailAccount } from "@/utils/swr";
 export function useRules() {
   return useSWRWithEmailAccount<RulesResponse, { error: string }>(
     "/api/user/rules",
+    {
+      revalidateOnMount: true, // Always fetch fresh data when component mounts
+      revalidateOnFocus: false,
+    },
   );
 }

@@ -1,4 +1,4 @@
-import type { SWRResponse } from "swr";
+import type { SWRResponse, SWRConfiguration } from "swr";
 import useSWR from "swr";
 import { useAccount } from "@/providers/EmailAccountProvider";
 
@@ -6,9 +6,10 @@ import { useAccount } from "@/providers/EmailAccountProvider";
 // Otherwise the backend will return an error
 export function useSWRWithEmailAccount<Data = unknown, Error = unknown>(
   url: string,
+  options?: SWRConfiguration<Data, Error>,
 ) {
   const { emailAccountId } = useAccount();
-  return useSWR<Data, Error>(emailAccountId ? url : null);
+  return useSWR<Data, Error>(emailAccountId ? url : null, options);
 }
 
 type NormalizedError = { error: string };

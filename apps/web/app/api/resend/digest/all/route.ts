@@ -18,29 +18,48 @@ async function sendDigestAllUpdate() {
 
   const now = new Date();
 
-  // Get all email accounts that are due for a digest
-  const emailAccounts = await prisma.emailAccount.findMany({
+  // Get all schedules that are due
+  const dueSchedules = await prisma.schedule.findMany({
     where: {
-      digestSchedule: {
-        nextOccurrenceAt: { lte: now },
-      },
-      // Only send to premium users
-      user: {
-        premium: {
-          OR: [
-            { lemonSqueezyRenewsAt: { gt: now } },
-            { stripeSubscriptionStatus: { in: ["active", "trialing"] } },
-          ],
+      nextOccurrenceAt: { lte: now },
+    },
+    include: {
+      emailAccount: {
+        include: {
+          user: {
+            include: {
+              premium: true,
+            },
+          },
         },
       },
-      createdAt: {
-        lt: subDays(now, 1),
-      },
     },
-    select: {
-      id: true,
-      email: true,
-    },
+  });
+
+  // Filter for premium users and accounts created more than 1 day ago
+  const eligibleSchedules = dueSchedules.filter((schedule) => {
+    const { emailAccount } = schedule;
+    const isPremium =
+      emailAccount.user.premium &&
+      ((emailAccount.user.premium.lemonSqueezyRenewsAt &&
+        emailAccount.user.premium.lemonSqueezyRenewsAt > now) ||
+        ["active", "trialing"].includes(
+          emailAccount.user.premium.stripeSubscriptionStatus || "",
+        ));
+    const isOldEnough = emailAccount.createdAt < subDays(now, 1);
+    return isPremium && isOldEnough;
+  });
+
+  // Group by emailAccountId to avoid sending duplicate digests
+  const emailAccountIds = new Set(
+    eligibleSchedules.map((s) => s.emailAccount.id),
+  );
+  const emailAccounts = Array.from(emailAccountIds).map((id) => {
+    const schedule = eligibleSchedules.find((s) => s.emailAccount.id === id);
+    return {
+      id,
+      email: schedule!.emailAccount.email,
+    };
   });
 
   logger.info("Sending digest to users", {

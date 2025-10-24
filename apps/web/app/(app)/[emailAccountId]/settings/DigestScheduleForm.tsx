@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { type SubmitHandler, useForm } from "react-hook-form";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import useSWR from "swr";
 import {
   Select,
@@ -25,6 +25,8 @@ import { LoadingContent } from "@/components/LoadingContent";
 import { ErrorMessage } from "@/components/Input";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Trash2, Plus } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
 const digestScheduleFormSchema = z.object({
   schedule: z.string().min(1, "Please select a frequency"),
@@ -100,6 +102,55 @@ function DigestScheduleFormInner({
   showSaveButton: boolean;
 }) {
   const { emailAccountId } = useAccount();
+  const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  const [showAddForm, setShowAddForm] = useState(false);
+
+  const schedules = Array.isArray(data) ? data : [];
+
+  // Format time in user's local timezone
+  const formatScheduleTime = (timeOfDay: Date | null | undefined) => {
+    if (!timeOfDay) return "Not set";
+    const date = new Date(timeOfDay);
+    const hours = date.getHours();
+    const minutes = date.getMinutes();
+    const ampm = hours >= 12 ? "PM" : "AM";
+    const displayHour = hours % 12 || 12;
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const tzAbbr = new Date()
+      .toLocaleTimeString("en-US", {
+        timeZone: timezone,
+        timeZoneName: "short",
+      })
+      .split(" ")
+      .pop();
+
+    return `${displayHour}:${minutes.toString().padStart(2, "0")} ${ampm} ${tzAbbr}`;
+  };
+
+  const deleteSchedule = async (scheduleId: string) => {
+    setIsDeleting(scheduleId);
+    try {
+      const response = await fetch(`/api/user/digest-schedule/${scheduleId}`, {
+        method: "DELETE",
+        headers: {
+          "X-Email-Account-ID": emailAccountId,
+        },
+      });
+
+      if (response.ok) {
+        toastSuccess({ description: "Schedule deleted successfully" });
+        mutate();
+      } else {
+        toastError({ description: "Failed to delete schedule" });
+      }
+    } catch (error) {
+      toastError({
+        description: "An error occurred while deleting the schedule",
+      });
+    } finally {
+      setIsDeleting(null);
+    }
+  };
 
   const {
     handleSubmit,
@@ -168,173 +219,264 @@ function DigestScheduleFormInner({
         intervalDays,
         occurrences: 1,
         daysOfWeek: dayOfWeekToBitmask(Number.parseInt(dayOfWeek, 10)),
-        timeOfDay,
+        timeOfDay: timeOfDay.toISOString(),
       };
 
-      execute(scheduleData);
+      try {
+        const response = await fetch("/api/user/digest-schedule", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(scheduleData),
+        });
+
+        if (response.ok) {
+          toastSuccess({ description: "Schedule created successfully!" });
+          mutate();
+          setShowAddForm(false);
+        } else {
+          const error = await response.json();
+          toastError({
+            description: error.error || "Failed to create schedule",
+          });
+        }
+      } catch (error) {
+        toastError({
+          description: "An error occurred while creating the schedule",
+        });
+      }
     },
-    [execute],
+    [mutate],
   );
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)}>
-      <Label className="mb-2 mt-4">Send the digest email</Label>
-
-      <div className="grid grid-cols-3 gap-2">
-        <FormItem>
-          <Label htmlFor="frequency-select">Every</Label>
-          <Select
-            value={watchedValues.schedule}
-            onValueChange={(val) => setValue("schedule", val)}
-          >
-            <SelectTrigger id="frequency-select">
-              {watchedValues.schedule
-                ? frequencies.find((f) => f.value === watchedValues.schedule)
-                    ?.label
-                : "Select..."}
-            </SelectTrigger>
-            <SelectContent>
-              {frequencies.map((f) => (
-                <SelectItem key={f.value} value={f.value}>
-                  {f.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {errors.schedule && (
-            <ErrorMessage
-              message={errors.schedule.message || "This field is required"}
-            />
-          )}
-        </FormItem>
-
-        {watchedValues.schedule !== "daily" && (
-          <FormItem>
-            <Label htmlFor="dayofweek-select">
-              {watchedValues.schedule === "monthly" ||
-              watchedValues.schedule === "biweekly"
-                ? "on the first"
-                : "on"}
-            </Label>
-            <Select
-              value={watchedValues.dayOfWeek}
-              onValueChange={(val) => setValue("dayOfWeek", val)}
-            >
-              <SelectTrigger id="dayofweek-select">
-                {watchedValues.dayOfWeek
-                  ? daysOfWeek.find((d) => d.value === watchedValues.dayOfWeek)
-                      ?.label
-                  : "Select..."}
-              </SelectTrigger>
-              <SelectContent>
-                {daysOfWeek.map((d) => (
-                  <SelectItem key={d.value} value={d.value}>
-                    {d.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {errors.dayOfWeek && (
-              <ErrorMessage
-                message={errors.dayOfWeek.message || "Please select a day"}
-              />
-            )}
-          </FormItem>
-        )}
-
-        <div className="space-y-2">
-          <Label>at</Label>
-          <div className="flex items-end gap-2">
-            <FormItem>
-              <Select
-                value={watchedValues.hour}
-                onValueChange={(val) => setValue("hour", val)}
+    <div className="space-y-6">
+      {/* Existing Schedules */}
+      {schedules.length > 0 && (
+        <div>
+          <Label>Current Digest Schedules</Label>
+          <div className="mt-3 space-y-2">
+            {schedules.map((schedule) => (
+              <div
+                key={schedule.id}
+                className="flex items-center justify-between p-3 border rounded-md bg-gray-50"
               >
-                <SelectTrigger id="hour-select">
-                  {watchedValues.hour}
-                </SelectTrigger>
-                <SelectContent>
-                  {hours.map((h) => (
-                    <SelectItem key={h.value} value={h.value}>
-                      {h.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </FormItem>
-            <span className="pb-2">:</span>
-            <FormItem>
-              <Select
-                value={watchedValues.minute}
-                onValueChange={(val) => setValue("minute", val)}
-              >
-                <SelectTrigger id="minute-select">
-                  {watchedValues.minute}
-                </SelectTrigger>
-                <SelectContent>
-                  {minutes.map((m) => (
-                    <SelectItem key={m.value} value={m.value}>
-                      {m.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </FormItem>
-            <FormItem>
-              <Select
-                value={watchedValues.ampm}
-                onValueChange={(val) => setValue("ampm", val as "AM" | "PM")}
-              >
-                <SelectTrigger id="ampm-select">
-                  {watchedValues.ampm}
-                </SelectTrigger>
-                <SelectContent>
-                  {ampmOptions.map((a) => (
-                    <SelectItem key={a.value} value={a.value}>
-                      {a.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </FormItem>
+                <div className="flex items-center gap-3">
+                  <Badge variant="outline">Daily</Badge>
+                  <span className="font-medium">
+                    {formatScheduleTime(schedule.timeOfDay)}
+                  </span>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => deleteSchedule(schedule.id)}
+                  disabled={isDeleting === schedule.id}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
           </div>
-          {(errors.hour || errors.minute || errors.ampm) && (
-            <div className="space-y-1">
-              {errors.hour && (
+        </div>
+      )}
+
+      {/* Add Schedule Button */}
+      {!showAddForm && (
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => setShowAddForm(true)}
+          className="w-full"
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          Add Schedule Time
+        </Button>
+      )}
+
+      {/* Add/Edit Schedule Form */}
+      {(showAddForm || schedules.length === 0) && (
+        <form onSubmit={handleSubmit(onSubmit)}>
+          <Label className="mb-2 mt-4">
+            {schedules.length === 0
+              ? "Set up digest schedule"
+              : "Add new schedule"}
+          </Label>
+
+          <div className="grid grid-cols-3 gap-2">
+            <FormItem>
+              <Label htmlFor="frequency-select">Every</Label>
+              <Select
+                value={watchedValues.schedule}
+                onValueChange={(val) => setValue("schedule", val)}
+              >
+                <SelectTrigger id="frequency-select">
+                  {watchedValues.schedule
+                    ? frequencies.find(
+                        (f) => f.value === watchedValues.schedule,
+                      )?.label
+                    : "Select..."}
+                </SelectTrigger>
+                <SelectContent>
+                  {frequencies.map((f) => (
+                    <SelectItem key={f.value} value={f.value}>
+                      {f.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {errors.schedule && (
                 <ErrorMessage
-                  message={errors.hour.message || "Please select an hour"}
+                  message={errors.schedule.message || "This field is required"}
                 />
               )}
-              {errors.minute && (
-                <ErrorMessage
-                  message={errors.minute.message || "Please select minutes"}
-                />
+            </FormItem>
+
+            {watchedValues.schedule !== "daily" && (
+              <FormItem>
+                <Label htmlFor="dayofweek-select">
+                  {watchedValues.schedule === "monthly" ||
+                  watchedValues.schedule === "biweekly"
+                    ? "on the first"
+                    : "on"}
+                </Label>
+                <Select
+                  value={watchedValues.dayOfWeek}
+                  onValueChange={(val) => setValue("dayOfWeek", val)}
+                >
+                  <SelectTrigger id="dayofweek-select">
+                    {watchedValues.dayOfWeek
+                      ? daysOfWeek.find(
+                          (d) => d.value === watchedValues.dayOfWeek,
+                        )?.label
+                      : "Select..."}
+                  </SelectTrigger>
+                  <SelectContent>
+                    {daysOfWeek.map((d) => (
+                      <SelectItem key={d.value} value={d.value}>
+                        {d.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {errors.dayOfWeek && (
+                  <ErrorMessage
+                    message={errors.dayOfWeek.message || "Please select a day"}
+                  />
+                )}
+              </FormItem>
+            )}
+
+            <div className="space-y-2">
+              <Label>at</Label>
+              <div className="flex items-end gap-2">
+                <FormItem>
+                  <Select
+                    value={watchedValues.hour}
+                    onValueChange={(val) => setValue("hour", val)}
+                  >
+                    <SelectTrigger id="hour-select">
+                      {watchedValues.hour}
+                    </SelectTrigger>
+                    <SelectContent>
+                      {hours.map((h) => (
+                        <SelectItem key={h.value} value={h.value}>
+                          {h.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </FormItem>
+                <span className="pb-2">:</span>
+                <FormItem>
+                  <Select
+                    value={watchedValues.minute}
+                    onValueChange={(val) => setValue("minute", val)}
+                  >
+                    <SelectTrigger id="minute-select">
+                      {watchedValues.minute}
+                    </SelectTrigger>
+                    <SelectContent>
+                      {minutes.map((m) => (
+                        <SelectItem key={m.value} value={m.value}>
+                          {m.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </FormItem>
+                <FormItem>
+                  <Select
+                    value={watchedValues.ampm}
+                    onValueChange={(val) =>
+                      setValue("ampm", val as "AM" | "PM")
+                    }
+                  >
+                    <SelectTrigger id="ampm-select">
+                      {watchedValues.ampm}
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ampmOptions.map((a) => (
+                        <SelectItem key={a.value} value={a.value}>
+                          {a.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </FormItem>
+              </div>
+              {(errors.hour || errors.minute || errors.ampm) && (
+                <div className="space-y-1">
+                  {errors.hour && (
+                    <ErrorMessage
+                      message={errors.hour.message || "Please select an hour"}
+                    />
+                  )}
+                  {errors.minute && (
+                    <ErrorMessage
+                      message={errors.minute.message || "Please select minutes"}
+                    />
+                  )}
+                  {errors.ampm && (
+                    <ErrorMessage
+                      message={errors.ampm.message || "Please select AM or PM"}
+                    />
+                  )}
+                </div>
               )}
-              {errors.ampm && (
-                <ErrorMessage
-                  message={errors.ampm.message || "Please select AM or PM"}
-                />
+            </div>
+          </div>
+          {showSaveButton && (
+            <div className="flex gap-2 mt-4">
+              <Button type="submit" loading={isExecuting || isSubmitting}>
+                {schedules.length === 0 ? "Save" : "Add Schedule"}
+              </Button>
+              {showAddForm && schedules.length > 0 && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowAddForm(false)}
+                >
+                  Cancel
+                </Button>
               )}
             </div>
           )}
-        </div>
-      </div>
-      {showSaveButton && (
-        <Button
-          type="submit"
-          loading={isExecuting || isSubmitting}
-          className="mt-4"
-        >
-          Save
-        </Button>
+        </form>
       )}
-    </form>
+    </div>
   );
 }
 
 function getInitialScheduleProps(
-  digestSchedule?: GetDigestScheduleResponse | null,
+  digestSchedules?: GetDigestScheduleResponse | null,
 ) {
+  // Use the first schedule if multiple exist
+  const digestSchedule =
+    Array.isArray(digestSchedules) && digestSchedules.length > 0
+      ? digestSchedules[0]
+      : null;
+
   const initialSchedule = (() => {
     if (!digestSchedule) return "daily";
     switch (digestSchedule.intervalDays) {

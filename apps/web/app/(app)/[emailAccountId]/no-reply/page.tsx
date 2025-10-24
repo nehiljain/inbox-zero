@@ -22,13 +22,7 @@ export default function NoReplyPage() {
         {data && (
           <div>
             <EmailList
-              threads={data.map((item) => ({
-                id: item.thread.id,
-                messages: item.thread.messages,
-                snippet: item.thread.snippet,
-                plan: undefined, // No plan data available for sent messages
-                category: null, // No category data available for sent messages
-              }))}
+              threads={data as unknown as Thread[]}
               hideActionBarWhenEmpty
               refetch={() => mutate()}
             />

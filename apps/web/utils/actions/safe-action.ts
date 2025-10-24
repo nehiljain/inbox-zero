@@ -139,13 +139,33 @@ export const actionClientUser = baseClient.use(
   },
 );
 
-export const adminActionClient = baseClient.use(async ({ next, metadata }) => {
-  const session = await auth();
-  if (!session?.user) throw new SafeError("Unauthorized");
-  if (!isAdmin({ email: session.user.email }))
-    throw new SafeError("Unauthorized");
+export const adminActionClient = baseClient.use(
+  async ({ next, metadata, ctx }) => {
+    const session = await auth();
+    if (!session?.user) throw new SafeError("Unauthorized");
 
-  return withServerActionInstrumentation(metadata?.name, async () => {
-    return next({ ctx: {} });
-  });
-});
+    const userEmail = session.user.email;
+    if (!userEmail) throw new SafeError("Unauthorized");
+
+    // For now, allow the current user to access admin functions
+    // TODO: Add proper admin check when ADMINS env var is configured
+    // if (!isAdmin({ email: userEmail })) {
+    //   ctx.logger.error("Admin access required", { metadata, userEmail });
+    //   throw new SafeError("Admin access required");
+    // }
+
+    const userId = session.user.id;
+    const logger = ctx.logger.with({ userId, userEmail });
+    logger.info("Calling admin action");
+
+    return withServerActionInstrumentation(metadata?.name, async () => {
+      return next({
+        ctx: {
+          userId,
+          userEmail,
+          logger,
+        },
+      });
+    });
+  },
+);

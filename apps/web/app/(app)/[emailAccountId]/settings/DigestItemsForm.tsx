@@ -35,7 +35,10 @@ export function DigestItemsForm({
     isLoading: digestLoading,
     error: digestError,
     mutate: mutateDigestSettings,
-  } = useSWR<GetDigestSettingsResponse>("/api/user/digest-settings");
+  } = useSWR<GetDigestSettingsResponse>("/api/user/digest-settings", {
+    revalidateOnMount: true, // Always fetch fresh data when component mounts
+    revalidateOnFocus: false,
+  });
 
   const isLoading = rulesLoading || digestLoading;
   const error = rulesError || digestError;
@@ -59,7 +62,10 @@ export function DigestItemsForm({
 
       // Add rules that have digest actions
       rules.forEach((rule) => {
-        if (rule.actions.some((action) => action.type === ActionType.DIGEST)) {
+        const hasDigest = rule.actions.some(
+          (action) => action.type === ActionType.DIGEST,
+        );
+        if (hasDigest) {
           selectedItems.add(rule.id);
         }
       });
@@ -135,7 +141,20 @@ export function DigestItemsForm({
       loadingComponent={<Skeleton className="min-h-[500px] w-full" />}
     >
       <form onSubmit={handleSubmit(onSubmit)}>
-        <Label>What to include in the digest email</Label>
+        <div className="flex items-center justify-between">
+          <Label>What to include in the digest email</Label>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              mutateRules();
+              mutateDigestSettings();
+            }}
+          >
+            Refresh
+          </Button>
+        </div>
 
         <div className="mt-4">
           <MultiSelectFilter
