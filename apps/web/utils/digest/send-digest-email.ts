@@ -29,7 +29,9 @@ async function getDigestSchedule({
 }: {
   emailAccountId: string;
 }) {
-  return prisma.schedule.findUnique({
+  // Get the first schedule (oldest created) for this user
+  // In the future, we may want to handle multiple schedules differently
+  const schedules = await prisma.schedule.findMany({
     where: { emailAccountId },
     select: {
       id: true,
@@ -40,7 +42,11 @@ async function getDigestSchedule({
       lastOccurrenceAt: true,
       nextOccurrenceAt: true,
     },
+    orderBy: { createdAt: "asc" },
+    take: 1,
   });
+
+  return schedules[0] || null;
 }
 
 export async function sendEmail({

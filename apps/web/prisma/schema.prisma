@@ -128,13 +128,14 @@ model EmailAccount {
   rulesPrompt           String?
   outboundReplyTracking Boolean           @default(false) // When true: manages "To Reply" and "Awaiting Reply" labels automatically
   autoCategorizeSenders Boolean           @default(false)
+  digestMigrationCompleted Boolean        @default(false) // Track if user has been migrated to digest defaults
 
   // Configurable system labels (store stable IDs)
   needsReplyLabelId     String? // Gmail: Label ID, Outlook: Category ID
   awaitingReplyLabelId  String? // Gmail: Label ID, Outlook: Category ID
   coldEmailLabelId      String? // Gmail: Label ID, Outlook: Category ID
 
-  digestSchedule Schedule?
+  digestSchedules Schedule[]
 
   userId    String
   user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -289,7 +290,10 @@ model Schedule {
   lastOccurrenceAt DateTime?
   nextOccurrenceAt DateTime?
 
-  @@unique([emailAccountId])
+  // Prevent duplicate schedules with same timing
+  @@unique([emailAccountId, timeOfDay, intervalDays, daysOfWeek])
+  @@index([emailAccountId])
+  @@index([nextOccurrenceAt])
 }
 
 model Premium {

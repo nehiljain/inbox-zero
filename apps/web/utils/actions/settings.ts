@@ -71,14 +71,33 @@ export const updateDigestScheduleAction = actionClient
       }),
     };
 
-    // remove emailAccountId for update
-    const { emailAccountId: _emailAccountId, ...update } = create;
-
-    await prisma.schedule.upsert({
+    // First, try to find an existing schedule for this email account
+    const existingSchedule = await prisma.schedule.findFirst({
       where: { emailAccountId },
-      create,
-      update,
     });
+
+    if (existingSchedule) {
+      // Update existing schedule
+      await prisma.schedule.update({
+        where: { id: existingSchedule.id },
+        data: {
+          intervalDays,
+          daysOfWeek,
+          timeOfDay,
+          occurrences,
+          lastOccurrenceAt: new Date(),
+          nextOccurrenceAt: calculateNextScheduleDate({
+            ...parsedInput,
+            lastOccurrenceAt: null,
+          }),
+        },
+      });
+    } else {
+      // Create new schedule
+      await prisma.schedule.create({
+        data: create,
+      });
+    }
 
     return { success: true };
   });
