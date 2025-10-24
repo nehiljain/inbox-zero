@@ -13,23 +13,11 @@ import { RegisterSSOModal } from "@/app/(app)/admin/RegisterSSOModal";
 export default async function AdminPage() {
   const session = await auth();
 
-  // DEBUG: Add temporary logging
-  console.log("=== ADMIN DEBUG ===");
-  console.log("Session user email:", session?.user.email);
-  console.log("ADMINS env var:", process.env.ADMINS);
-  console.log("Is admin check:", isAdmin({ email: session?.user.email }));
-  console.log("==================");
-
   if (!isAdmin({ email: session?.user.email })) {
     return (
       <ErrorPage
         title="No Access"
-        description={`You do not have permission to access this page. 
-        
-Debug info:
-- Your email: ${session?.user.email}
-- ADMINS env: ${process.env.ADMINS}
-- Is admin: ${isAdmin({ email: session?.user.email })}`}
+        description="You do not have permission to access this page."
       />
     );
   }
