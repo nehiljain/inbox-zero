@@ -17,8 +17,6 @@ import { EmailViewer } from "@/components/EmailViewer";
 import { captureException } from "@/utils/error";
 import prisma from "@/utils/prisma";
 import { createScopedLogger } from "@/utils/logger";
-import { DevResetButton } from "@/components/DevResetButton";
-import { isAdmin } from "@/utils/admin";
 
 const logger = createScopedLogger("AppLayout");
 
@@ -75,7 +73,6 @@ export default async function AppLayout({
         <AssessUser />
         <SentryIdentify email={session.user.email} />
       </ErrorBoundary>
-      <DevResetButton isAdmin={!!isAdmin({ email: session.user.email })} />
     </AppProviders>
   );
 }

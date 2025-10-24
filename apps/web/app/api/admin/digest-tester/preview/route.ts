@@ -153,7 +153,7 @@ export const GET = withError(async (request) => {
 
   // Return JSON data that matches DigestEmail props structure
   return NextResponse.json({
-    baseUrl: process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000",
+    baseUrl: "http://localhost:3000",
     unsubscribeToken: "test-token",
     date: new Date().toISOString(),
     ruleNames: Object.fromEntries(ruleNameMap),
