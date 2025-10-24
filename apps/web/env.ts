@@ -240,5 +240,4 @@ export const env = createEnv({
       process.env.NEXT_PUBLIC_DISABLE_REFERRAL_SIGNATURE,
   },
   emptyStringAsUndefined: true,
-  skipValidation: !!process.env.SKIP_ENV_VALIDATION,
 });
