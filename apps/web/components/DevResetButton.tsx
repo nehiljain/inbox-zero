@@ -66,7 +66,8 @@ export function DevResetButton({ isAdmin }: { isAdmin: boolean }) {
   // Use client-safe checks: NODE_ENV and window.location
   const isLocalDev =
     process.env.NODE_ENV === "development" &&
-    (typeof window !== "undefined" && window.location.hostname === "localhost");
+    typeof window !== "undefined" &&
+    window.location.hostname === "localhost";
 
   if (!isLocalDev && !isAdmin) {
     return null;
