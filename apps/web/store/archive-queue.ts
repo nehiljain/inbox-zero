@@ -57,7 +57,7 @@ type ActionFunction = ({
 }: {
   threadId: string;
   labelId?: string;
-}) => Promise<any>;
+}) => Promise<unknown>;
 
 const addThreadsToQueue = ({
   actionType,
@@ -208,9 +208,12 @@ export function processQueue({
                 });
 
                 // when Gmail API returns a rate limit error, throw an error so it can be retried
-                if (result?.serverError) {
+                if (
+                  (result as { serverError?: boolean; error?: string })
+                    ?.serverError
+                ) {
                   await sleep(exponentialBackoff(attemptCount, 1000));
-                  throw new Error(result.error);
+                  throw new Error((result as { error?: string }).error);
                 }
                 onSuccess?.(threadId);
               },

@@ -32,7 +32,7 @@ export function RuleStatsChart({ dateRange, title }: RuleStatsChartProps) {
   return (
     <LoadingContent
       loading={isLoading}
-      error={error}
+      error={error as { error?: string; info?: { error: string } } | undefined}
       loadingComponent={<Skeleton className="h-64 w-full rounded" />}
     >
       {data && chartData.length > 0 && (

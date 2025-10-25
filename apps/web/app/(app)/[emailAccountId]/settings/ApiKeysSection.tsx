@@ -27,7 +27,12 @@ export function ApiKeysSection() {
         description="Create an API key to access the Inbox Zero API. Do not share your API key with others, or expose it in the browser or other client-side code."
       />
 
-      <LoadingContent loading={isLoading} error={error}>
+      <LoadingContent
+        loading={isLoading}
+        error={
+          error as { error?: string; info?: { error: string } } | undefined
+        }
+      >
         <div className="col-span-2 space-y-4">
           {data && data.apiKeys.length > 0 ? (
             <Card>

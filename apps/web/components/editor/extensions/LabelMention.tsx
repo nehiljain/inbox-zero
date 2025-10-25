@@ -14,7 +14,7 @@ interface MarkdownNode {
   attrs: {
     id?: string;
     label?: string;
-    [key: string]: any;
+    [key: string]: unknown;
   };
 }
 
@@ -28,7 +28,7 @@ interface MarkdownItState {
 interface MarkdownItToken {
   attrs: Array<[string, string]>;
   content?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 interface MarkdownItInstance {

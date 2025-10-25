@@ -36,7 +36,7 @@ export function DetailedStats(props: {
     unarchived: true,
   });
 
-  const params: StatsByWeekParams = {
+  const _params: StatsByWeekParams = {
     period,
     ...getDateRangeParams(dateRange),
   };
@@ -62,7 +62,7 @@ export function DetailedStats(props: {
   return (
     <LoadingContent
       loading={isLoading}
-      error={error}
+      error={error as { error?: string; info?: { error: string } } | undefined}
       loadingComponent={<Skeleton className="h-64 w-full rounded" />}
     >
       {data && (

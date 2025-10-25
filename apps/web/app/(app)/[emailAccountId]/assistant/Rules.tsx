@@ -215,7 +215,12 @@ export function Rules({
   return (
     <div>
       <Card>
-        <LoadingContent loading={isLoading} error={error}>
+        <LoadingContent
+          loading={isLoading}
+          error={
+            error as { error?: string; info?: { error: string } } | undefined
+          }
+        >
           {hasRules ? (
             <Table>
               <TableHeader>

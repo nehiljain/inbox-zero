@@ -258,7 +258,9 @@ export function DigestSettingsForm() {
       <div className="space-y-6">
         <LoadingContent
           loading={isLoading}
-          error={error}
+          error={
+            error as { error?: string; info?: { error: string } } | undefined
+          }
           loadingComponent={<Skeleton className="min-h-[200px] w-full" />}
         >
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">

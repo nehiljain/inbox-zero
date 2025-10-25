@@ -78,7 +78,7 @@ export function DigestScheduleForm({
   return (
     <LoadingContent
       loading={isLoading}
-      error={error}
+      error={error as { error?: string; info?: { error: string } } | undefined}
       loadingComponent={<Skeleton className="min-h-[200px] w-full" />}
     >
       <DigestScheduleFormInner

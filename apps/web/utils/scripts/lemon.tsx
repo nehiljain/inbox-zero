@@ -16,13 +16,21 @@ export function LemonScript() {
       onLoad={() => {
         if (!window) return;
 
-        (window as any).lemonSqueezyAffiliateConfig = {
+        (
+          window as {
+            lemonSqueezyAffiliateConfig?: unknown;
+            createLemonSqueezyAffiliate?: () => void;
+          }
+        ).lemonSqueezyAffiliateConfig = {
           store: env.NEXT_PUBLIC_LEMON_STORE_ID,
           debug: true,
         };
 
-        if ((window as any).createLemonSqueezyAffiliate)
-          (window as any).createLemonSqueezyAffiliate();
+        const windowWithLemon = window as {
+          createLemonSqueezyAffiliate?: () => void;
+        };
+        if (windowWithLemon.createLemonSqueezyAffiliate)
+          windowWithLemon.createLemonSqueezyAffiliate();
       }}
     />
   );

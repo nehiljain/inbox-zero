@@ -15,7 +15,7 @@ export function EmailActionsAnalytics() {
   return (
     <LoadingContent
       loading={isLoading}
-      error={error}
+      error={error as { error?: string; info?: { error: string } } | undefined}
       loadingComponent={<Skeleton className="h-32 w-full rounded" />}
     >
       {data && (

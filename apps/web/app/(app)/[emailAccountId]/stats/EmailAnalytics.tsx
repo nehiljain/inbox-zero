@@ -44,7 +44,9 @@ export function EmailAnalytics(props: {
     <div className="grid gap-2 sm:gap-4 sm:grid-cols-3">
       <LoadingContent
         loading={isLoading}
-        error={error}
+        error={
+          error as { error?: string; info?: { error: string } } | undefined
+        }
         loadingComponent={<Skeleton className="h-64 w-full rounded" />}
       >
         {data && (
@@ -65,7 +67,9 @@ export function EmailAnalytics(props: {
       </LoadingContent>
       <LoadingContent
         loading={isLoading}
-        error={error}
+        error={
+          error as { error?: string; info?: { error: string } } | undefined
+        }
         loadingComponent={<Skeleton className="h-64 w-full rounded" />}
       >
         {data && (

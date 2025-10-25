@@ -73,7 +73,12 @@ export function MultiAccountSection() {
 
       <LoadingContent loading={isLoadingPremium} error={errorPremium}>
         {isPremium ? (
-          <LoadingContent loading={isLoading} error={error}>
+          <LoadingContent
+            loading={isLoading}
+            error={
+              error as { error?: string; info?: { error: string } } | undefined
+            }
+          >
             {data && (
               <div>
                 {!data?.admins.length && (

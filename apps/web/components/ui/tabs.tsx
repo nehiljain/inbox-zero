@@ -13,7 +13,7 @@ interface Context {
   searchParam: string;
   selected: string;
 }
-const TabsContext = React.createContext<Context>(null as any);
+const TabsContext = React.createContext<Context | null>(null);
 
 export function Tabs(props: {
   children: React.ReactNode;

@@ -36,7 +36,12 @@ export function History() {
     <>
       <RulesSelect />
       <Card className="mt-2">
-        <LoadingContent loading={isLoading} error={error}>
+        <LoadingContent
+          loading={isLoading}
+          error={
+            error as { error?: string; info?: { error: string } } | undefined
+          }
+        >
           {data?.executedRules.length ? (
             <HistoryTable
               data={data.executedRules}

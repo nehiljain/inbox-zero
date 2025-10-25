@@ -120,7 +120,6 @@ export const GET = withError(async (request) => {
       });
 
       const headers = message.data.payload?.headers || [];
-      type Header = { name?: string; value?: string };
       return {
         messageId: id,
         from: headers.find((h) => h.name === "From")?.value || "",

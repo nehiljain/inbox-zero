@@ -1,4 +1,9 @@
-import { PrismaClient, ActionType, SystemType } from "@prisma/client";
+import {
+  PrismaClient,
+  ActionType,
+  SystemType,
+  type Prisma,
+} from "@prisma/client";
 import { createScopedLogger } from "@/utils/logger";
 
 const prisma = new PrismaClient();
@@ -64,7 +69,7 @@ export async function migrateUsersToDigestDefaults(): Promise<MigrationStats> {
             },
           },
         },
-      } as any,
+      } as Prisma.EmailAccountWhereInput,
       include: {
         rules: {
           include: {
@@ -91,11 +96,22 @@ export async function migrateUsersToDigestDefaults(): Promise<MigrationStats> {
       try {
         const result = await migrateUserDigestDefaults({
           id: user.id,
-          rules: (user as any).rules.map((rule: any) => ({
+          rules: (
+            user as {
+              rules: Array<{
+                id: string;
+                name: string;
+                systemType: SystemType;
+                actions: Array<{ type: ActionType }>;
+              }>;
+            }
+          ).rules.map((rule) => ({
             id: rule.id,
             name: rule.name,
             systemType: rule.systemType,
-            actions: rule.actions.map((action: any) => ({ type: action.type })),
+            actions: rule.actions.map((action) => ({
+              type: action.type as ActionType,
+            })),
           })),
         });
 

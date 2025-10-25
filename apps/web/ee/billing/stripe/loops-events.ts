@@ -20,7 +20,7 @@ export async function handleLoopsEvents({
     users: { email: string; name: string | null }[];
     admins: { email: string; name: string | null }[];
   } | null;
-  newSubscription: any;
+  newSubscription: unknown;
   newTier: string | null;
 }) {
   try {
@@ -38,8 +38,9 @@ export async function handleLoopsEvents({
 
     // 1. Trial started - new trial end date and no previous subscription status
     const hasNewTrial =
-      newSubscription.trial_end &&
-      newSubscription.trial_end > Date.now() / 1000 &&
+      (newSubscription as { trial_end?: number }).trial_end &&
+      (newSubscription as { trial_end?: number }).trial_end! >
+        Date.now() / 1000 &&
       !currentPremium.stripeSubscriptionStatus;
 
     if (hasNewTrial) {
@@ -59,10 +60,12 @@ export async function handleLoopsEvents({
     const wasInTrial =
       currentPremium.stripeTrialEnd &&
       currentPremium.stripeTrialEnd > new Date();
-    const isNowActive = newSubscription.status === "active";
+    const isNowActive =
+      (newSubscription as { status?: string }).status === "active";
     const noLongerInTrial =
-      !newSubscription.trial_end ||
-      newSubscription.trial_end <= Date.now() / 1000;
+      !(newSubscription as { trial_end?: number }).trial_end ||
+      (newSubscription as { trial_end?: number }).trial_end! <=
+        Date.now() / 1000;
 
     // 2a. Trial completed and converted to paid subscription
     const trialCompleted = isNowActive && wasInTrial && noLongerInTrial;
@@ -90,10 +93,12 @@ export async function handleLoopsEvents({
 
     // 3. Subscription cancelled
     const wasCancelled =
-      (newSubscription.status === "canceled" ||
-        newSubscription.status === "unpaid" ||
-        newSubscription.status === "incomplete_expired") &&
-      currentPremium.stripeSubscriptionStatus !== newSubscription.status;
+      ((newSubscription as { status?: string }).status === "canceled" ||
+        (newSubscription as { status?: string }).status === "unpaid" ||
+        (newSubscription as { status?: string }).status ===
+          "incomplete_expired") &&
+      currentPremium.stripeSubscriptionStatus !==
+        (newSubscription as { status?: string }).status;
 
     if (wasCancelled) {
       logger.info("Subscription cancelled", { email });

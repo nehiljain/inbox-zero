@@ -56,7 +56,12 @@ export function BulkRunRules() {
           <DialogHeader>
             <DialogTitle>Process Existing Inbox Emails</DialogTitle>
           </DialogHeader>
-          <LoadingContent loading={isLoading} error={error}>
+          <LoadingContent
+            loading={isLoading}
+            error={
+              error as { error?: string; info?: { error: string } } | undefined
+            }
+          >
             {data && (
               <>
                 <SectionDescription>

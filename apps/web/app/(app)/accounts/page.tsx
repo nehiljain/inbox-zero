@@ -29,7 +29,12 @@ export default function AccountsPage() {
     <PageWrapper>
       <PageHeader title="Accounts" description="Manage your email accounts." />
 
-      <LoadingContent loading={isLoading} error={error}>
+      <LoadingContent
+        loading={isLoading}
+        error={
+          error as { error?: string; info?: { error: string } } | undefined
+        }
+      >
         <div className="grid grid-cols-1 gap-4 py-6 md:grid-cols-2 lg:grid-cols-3">
           {data?.emailAccounts.map((emailAccount) => (
             <AccountItem

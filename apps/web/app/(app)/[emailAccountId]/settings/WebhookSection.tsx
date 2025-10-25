@@ -19,7 +19,12 @@ export function WebhookSection() {
 
       <div className="col-span-2">
         <Card className="p-6">
-          <LoadingContent loading={isLoading} error={error}>
+          <LoadingContent
+            loading={isLoading}
+            error={
+              error as { error?: string; info?: { error: string } } | undefined
+            }
+          >
             {data && (
               <div className="space-y-4">
                 {!!data.webhookSecret && (

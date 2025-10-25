@@ -96,7 +96,12 @@ export default function Mail(props: {
       <ClientOnly>
         <BetaBanner />
       </ClientOnly>
-      <LoadingContent loading={isLoading && !data} error={error}>
+      <LoadingContent
+        loading={isLoading && !data}
+        error={
+          error as { error?: string; info?: { error: string } } | undefined
+        }
+      >
         {allThreads && (
           <List
             emails={allThreads}

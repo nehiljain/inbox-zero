@@ -102,7 +102,12 @@ export function FixWithChat({
           <DialogTitle>Improve Rules</DialogTitle>
         </DialogHeader>
 
-        <LoadingContent loading={isLoading} error={error}>
+        <LoadingContent
+          loading={isLoading}
+          error={
+            error as { error?: string; info?: { error: string } } | undefined
+          }
+        >
           {data && !showExplanation ? (
             <RuleMismatch
               result={result}

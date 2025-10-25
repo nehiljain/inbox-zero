@@ -150,7 +150,9 @@ export function CategoriesSetup({
 
       <LoadingContent
         loading={isLoading}
-        error={error}
+        error={
+          error as { error?: string; info?: { error: string } } | undefined
+        }
         loadingComponent={<Skeleton className="w-full h-[500px] mt-6" />}
       >
         {suggestedCategories.length > 0 ? (

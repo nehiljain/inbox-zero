@@ -50,7 +50,7 @@ export function StatsSummary(props: {
   return (
     <LoadingContent
       loading={isLoading}
-      error={error}
+      error={error as { error?: string; info?: { error: string } } | undefined}
       loadingComponent={<Skeleton className="h-64 rounded" />}
     >
       {data && (

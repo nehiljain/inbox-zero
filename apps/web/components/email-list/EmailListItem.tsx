@@ -81,7 +81,7 @@ export const EmailListItem = forwardRef(
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
               e.preventDefault();
-              props.onClick(e as any);
+              props.onClick(e as unknown as React.MouseEvent<HTMLLIElement>);
             }
           }}
         >

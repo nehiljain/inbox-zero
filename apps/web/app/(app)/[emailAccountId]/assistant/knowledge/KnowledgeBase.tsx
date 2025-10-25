@@ -72,7 +72,12 @@ export function KnowledgeBase() {
       </Dialog>
 
       <Card className="mt-2">
-        <LoadingContent loading={isLoading} error={error}>
+        <LoadingContent
+          loading={isLoading}
+          error={
+            error as { error?: string; info?: { error: string } } | undefined
+          }
+        >
           <Table>
             <TableHeader>
               <TableRow>
