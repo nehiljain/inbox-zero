@@ -12,12 +12,38 @@ export const GET = withError(async (_request) => {
   }
 
   // Read prompt from production file
-  const filePath = path.join(
-    process.cwd(),
-    "apps/web/utils/ai/digest/summarize-email-for-digest.ts",
-  );
+  // Try multiple possible paths for different deployment environments
+  const possiblePaths = [
+    path.join(
+      process.cwd(),
+      "apps/web/utils/ai/digest/summarize-email-for-digest.ts",
+    ),
+    path.join(process.cwd(), "utils/ai/digest/summarize-email-for-digest.ts"),
+    path.join(
+      process.cwd(),
+      "apps/web/apps/web/utils/ai/digest/summarize-email-for-digest.ts",
+    ),
+  ];
 
-  const content = await fs.readFile(filePath, "utf-8");
+  let content = "";
+  let filePath = "";
+
+  for (const testPath of possiblePaths) {
+    try {
+      content = await fs.readFile(testPath, "utf-8");
+      filePath = testPath;
+      break;
+    } catch (error) {
+      // Continue to next path
+    }
+  }
+
+  if (!content) {
+    return NextResponse.json(
+      { error: "Could not find summarize-email-for-digest.ts file" },
+      { status: 500 },
+    );
+  }
 
   // Extract system prompt (find text between const system = ` and next `)
   const startMarker = "const system = `";
@@ -35,7 +61,7 @@ export const GET = withError(async (_request) => {
 
   return NextResponse.json({
     prompt,
-    file: "apps/web/utils/ai/digest/summarize-email-for-digest.ts",
+    file: filePath,
   });
 });
 
