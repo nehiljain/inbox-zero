@@ -281,7 +281,12 @@ export function ProcessRulesContent({ testMode }: { testMode: boolean }) {
         </div>
       )}
 
-      <LoadingContent loading={isLoading} error={error}>
+      <LoadingContent
+        loading={isLoading}
+        error={
+          error as { error?: string; info?: { error: string } } | undefined
+        }
+      >
         {messages.length === 0 ? (
           <div className="p-4 text-center text-sm text-muted-foreground">
             No emails found

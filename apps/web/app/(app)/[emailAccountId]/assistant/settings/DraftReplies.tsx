@@ -34,7 +34,9 @@ export function DraftReplies() {
       right={
         <LoadingContent
           loading={loading}
-          error={error}
+          error={
+            error as { error?: string; info?: { error: string } } | undefined
+          }
           loadingComponent={<Skeleton className="h-8 w-32" />}
         >
           <Toggle

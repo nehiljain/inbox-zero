@@ -157,7 +157,10 @@ function EmailsChart(props: {
   const { data, isLoading, error } = useSenderEmails(props);
 
   return (
-    <LoadingContent loading={isLoading} error={error}>
+    <LoadingContent
+      loading={isLoading}
+      error={error as { error?: string; info?: { error: string } } | undefined}
+    >
       {data && (
         <BarChart
           className="h-72"
@@ -207,7 +210,10 @@ function UnarchivedEmails({
   });
 
   return (
-    <LoadingContent loading={isLoading} error={error}>
+    <LoadingContent
+      loading={isLoading}
+      error={error as { error?: string; info?: { error: string } } | undefined}
+    >
       {data && (
         <EmailList
           threads={data.threads}
@@ -239,7 +245,10 @@ function AllEmails({
   });
 
   return (
-    <LoadingContent loading={isLoading} error={error}>
+    <LoadingContent
+      loading={isLoading}
+      error={error as { error?: string; info?: { error: string } } | undefined}
+    >
       {data && (
         <EmailList
           threads={data.threads}

@@ -17,7 +17,12 @@ export default function OnboardingPage() {
 
   return (
     <Card className="my-4 w-full max-w-2xl p-6 sm:mx-4 md:mx-auto">
-      <LoadingContent loading={isLoading} error={error}>
+      <LoadingContent
+        loading={isLoading}
+        error={
+          error as { error?: string; info?: { error: string } } | undefined
+        }
+      >
         <CategoriesSetup defaultValues={defaultValues || []} />
       </LoadingContent>
     </Card>

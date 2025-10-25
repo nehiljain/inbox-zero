@@ -64,7 +64,14 @@ export function RuleDialog({
         </DialogHeader>
         <div>
           {ruleId ? (
-            <LoadingContent loading={isLoading} error={error}>
+            <LoadingContent
+              loading={isLoading}
+              error={
+                error as
+                  | { error?: string; info?: { error: string } }
+                  | undefined
+              }
+            >
               {data && (
                 <RuleForm
                   rule={data.rule}

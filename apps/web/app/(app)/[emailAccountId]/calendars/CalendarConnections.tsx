@@ -9,7 +9,10 @@ export function CalendarConnections() {
   const connections = data?.connections || [];
 
   return (
-    <LoadingContent loading={isLoading} error={error}>
+    <LoadingContent
+      loading={isLoading}
+      error={error as { error?: string; info?: { error: string } } | undefined}
+    >
       <div className="space-y-6">
         {connections.length === 0 ? (
           <div className="text-center text-muted-foreground py-10">

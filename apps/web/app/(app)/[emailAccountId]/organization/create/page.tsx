@@ -61,7 +61,10 @@ export default function CreateOrganizationPage() {
   );
 
   return (
-    <LoadingContent loading={isLoading} error={error}>
+    <LoadingContent
+      loading={isLoading}
+      error={error as { error?: string; info?: { error: string } } | undefined}
+    >
       <div className="container mx-auto py-8">
         <div className="max-w-2xl mx-auto">
           <div className="mb-8">

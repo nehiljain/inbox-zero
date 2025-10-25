@@ -35,7 +35,10 @@ const EmailContext = createContext<Context>({
 
 export const useEmail = () => useContext<Context>(EmailContext);
 
-function mapLabelColor(provider: string, label: any): EmailLabel["color"] {
+function mapLabelColor(
+  provider: string,
+  label: { color?: EmailLabel["color"] },
+): EmailLabel["color"] {
   if (!provider) {
     return undefined;
   }

@@ -13,7 +13,10 @@ export function Usage(props: { usage: RedisUsage | null }) {
   const { premium, isLoading, error } = usePremium();
 
   return (
-    <LoadingContent loading={isLoading} error={error}>
+    <LoadingContent
+      loading={isLoading}
+      error={error as { error?: string; info?: { error: string } } | undefined}
+    >
       <StatsCards
         stats={[
           {

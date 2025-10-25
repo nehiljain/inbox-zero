@@ -117,7 +117,9 @@ function ViewGroupInner({ groupId }: { groupId: string }) {
       <div className="mt-2">
         <LoadingContent
           loading={!data && isLoading}
-          error={error}
+          error={
+            error as { error?: string; info?: { error: string } } | undefined
+          }
           loadingComponent={<Skeleton className="m-4 h-24 rounded" />}
         >
           {data &&

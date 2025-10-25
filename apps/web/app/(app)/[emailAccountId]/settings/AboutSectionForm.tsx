@@ -40,7 +40,7 @@ export function AboutSection() {
   return (
     <LoadingContent
       loading={isLoading}
-      error={error}
+      error={error as { error?: string; info?: { error: string } } | undefined}
       loadingComponent={<Skeleton className="h-32 w-full" />}
     >
       <AboutSectionForm about={data?.about ?? null} mutate={mutate} />

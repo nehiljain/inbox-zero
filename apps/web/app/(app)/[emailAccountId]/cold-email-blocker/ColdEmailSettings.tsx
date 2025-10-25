@@ -30,7 +30,10 @@ export function ColdEmailSettings() {
   const { data, isLoading, error, mutate } = useEmailAccountFull();
 
   return (
-    <LoadingContent loading={isLoading} error={error}>
+    <LoadingContent
+      loading={isLoading}
+      error={error as { error?: string; info?: { error: string } } | undefined}
+    >
       {data && (
         <div className="space-y-10">
           <ColdEmailForm

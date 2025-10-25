@@ -53,7 +53,12 @@ export default function RuleExamplesPage(props: {
           </>
         }
       />
-      <LoadingContent loading={!data && isLoading} error={error}>
+      <LoadingContent
+        loading={!data && isLoading}
+        error={
+          error as { error?: string; info?: { error: string } } | undefined
+        }
+      >
         <ExampleList groupedBySenders={groupedBySenders} />
       </LoadingContent>
     </div>

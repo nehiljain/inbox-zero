@@ -21,7 +21,12 @@ export function Integrations() {
 
   return (
     <Card>
-      <LoadingContent loading={isLoading} error={error}>
+      <LoadingContent
+        loading={isLoading}
+        error={
+          error as { error?: string; info?: { error: string } } | undefined
+        }
+      >
         <Table>
           <TableHeader>
             <TableRow>

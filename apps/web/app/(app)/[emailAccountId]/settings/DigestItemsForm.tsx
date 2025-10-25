@@ -137,7 +137,7 @@ export function DigestItemsForm({
   return (
     <LoadingContent
       loading={isLoading}
-      error={error}
+      error={error as { error?: string; info?: { error: string } } | undefined}
       loadingComponent={<Skeleton className="min-h-[500px] w-full" />}
     >
       <form onSubmit={handleSubmit(onSubmit)}>

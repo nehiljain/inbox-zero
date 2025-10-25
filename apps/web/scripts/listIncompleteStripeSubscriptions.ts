@@ -2,6 +2,7 @@
 
 import "dotenv/config";
 import { getStripe } from "@/ee/billing/stripe";
+import type Stripe from "stripe";
 
 async function main() {
   const stripe = getStripe();
@@ -10,7 +11,7 @@ async function main() {
     "Attaching payment methods to ALL Stripe subscriptions without payment methods...",
   );
 
-  let allSubscriptions: any[] = [];
+  let allSubscriptions: Stripe.Subscription[] = [];
   let hasMore = true;
   let startingAfter: string | undefined;
 
@@ -91,7 +92,9 @@ async function main() {
         const customerId =
           typeof customer === "object" && "id" in customer
             ? customer.id
-            : subscription.customer;
+            : typeof subscription.customer === "string"
+              ? subscription.customer
+              : subscription.customer.id;
 
         const paymentMethods = await stripe.paymentMethods.list({
           customer: customerId,
@@ -115,7 +118,7 @@ async function main() {
             try {
               // Get the original subscription items (prices/products)
               const originalItems = subscription.items.data.map(
-                (item: any) => ({
+                (item: Stripe.SubscriptionItem) => ({
                   price: item.price.id,
                   quantity: item.quantity,
                 }),

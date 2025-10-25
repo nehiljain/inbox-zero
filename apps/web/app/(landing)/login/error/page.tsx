@@ -31,7 +31,12 @@ export default function LogInErrorPage() {
 
   return (
     <BasicLayout>
-      <LoadingContent loading={isLoading} error={error}>
+      <LoadingContent
+        loading={isLoading}
+        error={
+          error as { error?: string; info?: { error: string } } | undefined
+        }
+      >
         <ErrorPage
           title="Error Logging In"
           description={`Please try again. If this error persists, please use the support chat or email us at ${env.NEXT_PUBLIC_SUPPORT_EMAIL}.`}

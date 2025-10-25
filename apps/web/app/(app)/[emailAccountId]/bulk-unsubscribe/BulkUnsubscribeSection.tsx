@@ -366,7 +366,9 @@ export function BulkUnsubscribe() {
         ) : (
           <LoadingContent
             loading={!data && isLoading}
-            error={error}
+            error={
+              error as { error?: string; info?: { error: string } } | undefined
+            }
             loadingComponent={
               <div className="p-4">
                 <Skeleton className="h-screen rounded" />

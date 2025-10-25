@@ -12,12 +12,51 @@ export const GET = withError(async (_request) => {
   }
 
   // Read prompt from production file
-  const filePath = path.join(
-    process.cwd(),
-    "utils/ai/digest/summarize-email-for-digest.ts",
-  );
+  // Try multiple possible paths for different deployment environments
+  const possiblePaths = [
+    path.join(
+      process.cwd(),
+      "apps/web/utils/ai/digest/summarize-email-for-digest.ts",
+    ),
+    path.join(process.cwd(), "utils/ai/digest/summarize-email-for-digest.ts"),
+    path.join(
+      process.cwd(),
+      "apps/web/apps/web/utils/ai/digest/summarize-email-for-digest.ts",
+    ),
+    path.join(
+      process.cwd(),
+      "apps/web/apps/web/apps/web/utils/ai/digest/summarize-email-for-digest.ts",
+    ),
+    "/var/task/apps/web/utils/ai/digest/summarize-email-for-digest.ts",
+    "/var/task/utils/ai/digest/summarize-email-for-digest.ts",
+  ];
 
-  const content = await fs.readFile(filePath, "utf-8");
+  let content = "";
+  let filePath = "";
+
+  console.log(
+    `Trying to find file. Current working directory: ${process.cwd()}`,
+  );
+  console.log("Possible paths:", possiblePaths);
+
+  for (const testPath of possiblePaths) {
+    try {
+      content = await fs.readFile(testPath, "utf-8");
+      filePath = testPath;
+      console.log(`Found file at: ${testPath}`);
+      break;
+    } catch (_error) {
+      console.log(`File not found at: ${testPath}`);
+      // Continue to next path
+    }
+  }
+
+  if (!content) {
+    return NextResponse.json(
+      { error: "Could not find summarize-email-for-digest.ts file" },
+      { status: 500 },
+    );
+  }
 
   // Extract system prompt (find text between const system = ` and next `)
   const startMarker = "const system = `";
@@ -35,7 +74,7 @@ export const GET = withError(async (_request) => {
 
   return NextResponse.json({
     prompt,
-    file: "utils/ai/digest/summarize-email-for-digest.ts",
+    file: filePath,
   });
 });
 

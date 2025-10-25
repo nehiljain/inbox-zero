@@ -4,42 +4,97 @@ import {
   runDigestMigrationAction,
   getDigestMigrationStatusAction,
 } from "@/utils/actions/digest-migration";
+import { createScopedLogger } from "@/utils/logger";
+
+const logger = createScopedLogger("api/digest-migration");
 
 export const GET = withError(async (request: NextRequest) => {
   const { searchParams } = new URL(request.url);
   const dryRun = searchParams.get("dryRun") === "true";
 
-  const result = await runDigestMigrationAction({ dryRun });
-  if (!result) {
-    return NextResponse.json({ error: "No result returned" }, { status: 500 });
+  logger.info("Running digest migration", { dryRun });
+
+  try {
+    const result = await runDigestMigrationAction({ dryRun });
+
+    if (result?.data?.success) {
+      return NextResponse.json(result.data);
+    } else {
+      return NextResponse.json(
+        {
+          error: result?.data?.error || result?.serverError,
+          message: result?.data?.message,
+        },
+        { status: 500 },
+      );
+    }
+  } catch (error) {
+    logger.error("Migration API failed", { error });
+    return NextResponse.json(
+      {
+        error: "Migration failed",
+        message: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 },
+    );
   }
-  if (result.serverError) {
-    return NextResponse.json({ error: result.serverError }, { status: 500 });
-  }
-  return NextResponse.json(result.data);
 });
 
 export const POST = withError(async (request: NextRequest) => {
   const body = await request.json();
   const { dryRun = false } = body;
 
-  const result = await runDigestMigrationAction({ dryRun });
-  if (!result) {
-    return NextResponse.json({ error: "No result returned" }, { status: 500 });
+  logger.info("Running digest migration via POST", { dryRun });
+
+  try {
+    const result = await runDigestMigrationAction({ dryRun });
+
+    if (result?.data?.success) {
+      return NextResponse.json(result.data);
+    } else {
+      return NextResponse.json(
+        {
+          error: result?.data?.error || result?.serverError,
+          message: result?.data?.message,
+        },
+        { status: 500 },
+      );
+    }
+  } catch (error) {
+    logger.error("Migration API failed", { error });
+    return NextResponse.json(
+      {
+        error: "Migration failed",
+        message: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 },
+    );
   }
-  if (result.serverError) {
-    return NextResponse.json({ error: result.serverError }, { status: 500 });
-  }
-  return NextResponse.json(result.data);
 });
 
+// Status endpoint
 export const PUT = withError(async () => {
-  const status = await getDigestMigrationStatusAction({});
-  if (!status) {
-    return NextResponse.json({ error: "No status returned" }, { status: 500 });
+  logger.info("Getting migration status");
+
+  try {
+    const result = await getDigestMigrationStatusAction({});
+
+    if (result?.data?.success) {
+      return NextResponse.json(result.data);
+    } else {
+      return NextResponse.json(
+        { error: result?.data?.error || result?.serverError },
+        { status: 500 },
+      );
+    }
+  } catch (error) {
+    logger.error("Status API failed", { error });
+    return NextResponse.json(
+      {
+        error: "Failed to get status",
+        message: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 },
+    );
   }
-  if (status.serverError) {
-    return NextResponse.json({ error: status.serverError }, { status: 500 });
-  }
-  return NextResponse.json(status.data);
 });

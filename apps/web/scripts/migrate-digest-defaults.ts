@@ -1,435 +1,319 @@
-#!/usr/bin/env tsx
-
-import { PrismaClient, ActionType, SystemType } from "@prisma/client";
-import { createScopedLogger } from "../utils/logger";
-import { createCanonicalTimeOfDay } from "../utils/schedule";
+import {
+  PrismaClient,
+  ActionType,
+  SystemType,
+  type Prisma,
+} from "@prisma/client";
+import { createScopedLogger } from "@/utils/logger";
 
 const prisma = new PrismaClient();
 const logger = createScopedLogger("digest-migration");
 
-// All categories that should have digest enabled
-const ALL_DIGEST_CATEGORIES = [
-  SystemType.TO_REPLY,
-  SystemType.NEWSLETTER,
-  SystemType.MARKETING,
-  SystemType.CALENDAR,
-  SystemType.RECEIPT,
-  SystemType.NOTIFICATION,
+// Categories that should have digest enabled by default
+const DEFAULT_DIGEST_CATEGORIES = [
+  "Newsletter",
+  "Receipt",
+  "Calendar",
+  "Notification",
+  "To Reply",
 ] as const;
 
-type MigrationResult = {
-  userId: string;
-  userEmail: string;
-  status: "success" | "skipped" | "error";
-  rulesUpdated: string[];
-  scheduleCreated?: boolean;
-  error?: string;
-};
+type DefaultDigestCategory = (typeof DEFAULT_DIGEST_CATEGORIES)[number];
 
-async function migrateUsersToDigestDefaults(dryRun = false): Promise<{
+interface MigrationStats {
   totalUsers: number;
-  migrated: number;
-  skipped: number;
-  errors: number;
-  results: MigrationResult[];
-}> {
-  logger.info("Starting digest migration", { dryRun });
+  processedUsers: number;
+  successfulMigrations: number;
+  skippedUsers: number;
+  failedUsers: number;
+  rulesUpdated: number;
+  errors: Array<{ userId: string; error: string }>;
+  [key: string]: unknown; // Add index signature for logging
+}
 
-  // Find users who haven't been migrated yet
-  // We migrate ALL users, not just those with system rules
-  // Users without system rules will just get the flags set for future use
-  const users = await prisma.emailAccount.findMany({
-    where: {
-      // digestMigrationCompleted: false, // Temporarily commented out due to Prisma type issues
-      // Only migrate users who have system rules
-      rules: {
-        some: {
-          systemType: {
-            in: [...ALL_DIGEST_CATEGORIES],
+/**
+ * Phase 1: Safe Migration Script
+ *
+ * This script enables digest for default categories for existing users
+ * who haven't customized their rules extensively.
+ */
+export async function migrateUsersToDigestDefaults(): Promise<MigrationStats> {
+  logger.info("Starting digest migration for default categories");
+
+  const stats: MigrationStats = {
+    totalUsers: 0,
+    processedUsers: 0,
+    successfulMigrations: 0,
+    skippedUsers: 0,
+    failedUsers: 0,
+    rulesUpdated: 0,
+    errors: [],
+  };
+
+  try {
+    // Find users who haven't been migrated yet
+    const users = await prisma.emailAccount.findMany({
+      where: {
+        digestMigrationCompleted: false,
+        // Only migrate users who have the default system rules
+        rules: {
+          some: {
+            systemType: {
+              in: [
+                SystemType.NEWSLETTER,
+                SystemType.RECEIPT,
+                SystemType.CALENDAR,
+                SystemType.NOTIFICATION,
+                SystemType.TO_REPLY,
+              ],
+            },
+          },
+        },
+      } as Prisma.EmailAccountWhereInput,
+      include: {
+        rules: {
+          include: {
+            actions: true,
           },
         },
       },
-    },
-    include: {
-      rules: {
-        include: { actions: true },
-      },
-    },
-  });
+      // Process in batches to avoid memory issues
+      take: 1000,
+    });
 
-  logger.info("Found users to migrate", { count: users.length });
+    stats.totalUsers = users.length;
+    logger.info(`Found ${stats.totalUsers} users to migrate`);
 
-  const results: MigrationResult[] = [];
-  let migrated = 0;
-  let skipped = 0;
-  let errors = 0;
+    if (stats.totalUsers === 0) {
+      logger.info("No users found for migration");
+      return stats;
+    }
 
-  for (const user of users) {
-    try {
-      const result = await migrateUserDigestDefaults(
-        {
+    // Process each user
+    for (const user of users) {
+      stats.processedUsers++;
+
+      try {
+        const result = await migrateUserDigestDefaults({
           id: user.id,
-          email: user.email,
-          rules: user.rules.map((rule: any) => ({
+          rules: (
+            user as {
+              rules: Array<{
+                id: string;
+                name: string;
+                systemType: SystemType;
+                actions: Array<{ type: ActionType }>;
+              }>;
+            }
+          ).rules.map((rule) => ({
             id: rule.id,
             name: rule.name,
             systemType: rule.systemType,
-            actions: rule.actions.map((action: any) => ({ type: action.type })),
+            actions: rule.actions.map((action) => ({
+              type: action.type as ActionType,
+            })),
           })),
-        },
-        dryRun,
-      );
-      results.push(result);
+        });
 
-      if (result.status === "success") migrated++;
-      else if (result.status === "skipped") skipped++;
-      else errors++;
-    } catch (error) {
-      logger.error("Failed to migrate user", {
-        userId: user.id,
-        error: error instanceof Error ? error.message : "Unknown error",
-      });
+        if (result.success) {
+          stats.successfulMigrations++;
+          stats.rulesUpdated += result.rulesUpdated;
 
-      results.push({
-        userId: user.id,
-        userEmail: user.email,
-        status: "error",
-        rulesUpdated: [],
-        error: error instanceof Error ? error.message : "Unknown error",
-      });
-      errors++;
+          // Mark user as migrated
+          await markUserMigrated(user.id);
+
+          logger.info(`Successfully migrated user ${user.id}`, {
+            rulesUpdated: result.rulesUpdated,
+            categories: result.categoriesUpdated,
+          });
+        } else {
+          stats.skippedUsers++;
+          logger.info(`Skipped user ${user.id}: ${result.reason}`);
+        }
+      } catch (error) {
+        stats.failedUsers++;
+        const errorMessage =
+          error instanceof Error ? error.message : "Unknown error";
+        stats.errors.push({ userId: user.id, error: errorMessage });
+
+        logger.error(`Failed to migrate user ${user.id}`, { error });
+        // Continue with next user instead of failing entire migration
+      }
     }
+
+    logger.info("Migration completed", stats);
+    return stats;
+  } catch (error) {
+    logger.error("Migration failed", { error });
+    throw error;
   }
-
-  const summary = {
-    totalUsers: users.length,
-    migrated,
-    skipped,
-    errors,
-    results,
-  };
-
-  logger.info("Migration completed", summary);
-  return summary;
 }
 
-async function migrateUserDigestDefaults(
-  user: {
+interface UserMigrationResult {
+  success: boolean;
+  reason?: string;
+  rulesUpdated: number;
+  categoriesUpdated: string[];
+}
+
+/**
+ * Migrate a single user's digest defaults
+ */
+async function migrateUserDigestDefaults(user: {
+  id: string;
+  rules: Array<{
     id: string;
-    email: string;
-    rules: Array<{
-      id: string;
-      name: string;
-      systemType: SystemType | null;
-      actions: Array<{ type: ActionType }>;
-    }>;
-  },
-  dryRun: boolean,
-): Promise<MigrationResult> {
-  const rulesUpdated: string[] = [];
+    name: string;
+    systemType: SystemType | null;
+    actions: Array<{ type: ActionType }>;
+  }>;
+}): Promise<UserMigrationResult> {
+  const categoriesUpdated: string[] = [];
+  let rulesUpdated = 0;
 
-  logger.info("Migrating user", {
-    userId: user.id,
-    userEmail: user.email,
-    dryRun,
-  });
+  // Check if user has heavily customized their rules
+  const hasCustomRules = user.rules.some(
+    (rule) =>
+      !rule.systemType &&
+      !DEFAULT_DIGEST_CATEGORIES.includes(rule.name as DefaultDigestCategory),
+  );
 
-  // Check each category
-  for (const categoryType of ALL_DIGEST_CATEGORIES) {
-    const rule = user.rules.find((r: any) => r.systemType === categoryType);
+  if (hasCustomRules) {
+    return {
+      success: false,
+      reason: "User has custom rules, skipping to avoid conflicts",
+      rulesUpdated: 0,
+      categoriesUpdated: [],
+    };
+  }
+
+  // Process each default category
+  for (const categoryName of DEFAULT_DIGEST_CATEGORIES) {
+    const rule = user.rules.find((r) => r.name === categoryName);
 
     if (!rule) {
-      logger.info("Rule not found for user", {
-        userId: user.id,
-        categoryType,
-      });
+      logger.warn(`User ${user.id} missing rule for category: ${categoryName}`);
       continue;
     }
 
     // Check if digest is already enabled
     const hasDigest = rule.actions.some(
-      (a: any) => a.type === ActionType.DIGEST,
+      (action) => action.type === ActionType.DIGEST,
     );
 
     if (hasDigest) {
-      logger.info("Digest already enabled", {
-        userId: user.id,
-        ruleName: rule.name,
-      });
+      logger.info(
+        `User ${user.id} already has digest enabled for ${categoryName}`,
+      );
       continue;
     }
 
-    // Check if user has customized this rule significantly
-    const hasCustomActions = rule.actions.some(
-      (a) =>
-        a.type !== ActionType.LABEL &&
-        a.type !== ActionType.ARCHIVE &&
-        a.type !== ActionType.MOVE_FOLDER,
-    );
-
-    if (hasCustomActions) {
-      logger.info("Skipping user with custom actions", {
-        userId: user.id,
-        ruleName: rule.name,
-        actions: rule.actions.map((a) => a.type),
-      });
-      continue; // Skip this rule but continue with other rules
-    }
-
-    if (!dryRun) {
-      // Add digest action
+    // Enable digest for this category
+    try {
       await prisma.action.create({
         data: {
           ruleId: rule.id,
           type: ActionType.DIGEST,
         },
       });
-    }
 
-    rulesUpdated.push(rule.name);
-    logger.info("Added digest action", {
-      userId: user.id,
-      ruleName: rule.name,
-      dryRun,
-    });
-  }
+      categoriesUpdated.push(categoryName);
+      rulesUpdated++;
 
-  // Always mark user as migrated and enable cold email digest
-  // Even if they have no system rules, we set the defaults for future use
-  let scheduleCreated = false;
-
-  if (!dryRun) {
-    await prisma.emailAccount.update({
-      where: { id: user.id },
-      data: {
-        digestMigrationCompleted: true,
-        // Also enable cold email digest by default
-        coldEmailDigest: true,
-      },
-    });
-    logger.info("Marked user as migrated", {
-      userId: user.id,
-      rulesUpdated: rulesUpdated.length,
-      hasSystemRules: rulesUpdated.length > 0,
-    });
-
-    // Create default daily schedule at 9 AM UTC if user doesn't have one
-    // Users can adjust timezone and add more schedules via UI
-    const existingSchedule = await prisma.schedule.findFirst({
-      where: { emailAccountId: user.id },
-    });
-
-    if (!existingSchedule) {
-      try {
-        await prisma.schedule.create({
-          data: {
-            emailAccountId: user.id,
-            intervalDays: 1, // Daily
-            occurrences: 1,
-            daysOfWeek: null,
-            timeOfDay: createCanonicalTimeOfDay(9, 0), // 9 AM UTC as default
-            lastOccurrenceAt: null,
-            nextOccurrenceAt: null, // Will be calculated by cron
-          },
-        });
-        scheduleCreated = true;
-        logger.info("Created default digest schedule", {
-          userId: user.id,
-          time: "9:00 AM UTC",
-        });
-      } catch (error) {
-        logger.error("Failed to create schedule", {
-          userId: user.id,
-          error: error instanceof Error ? error.message : "Unknown error",
-        });
-      }
-    } else {
-      logger.info("User already has schedule, skipping creation", {
-        userId: user.id,
-      });
+      logger.info(
+        `Enabled digest for user ${user.id}, category: ${categoryName}`,
+      );
+    } catch (error) {
+      logger.error(
+        `Failed to enable digest for user ${user.id}, category: ${categoryName}`,
+        { error },
+      );
+      throw error; // Re-throw to be caught by caller
     }
   }
 
   return {
-    userId: user.id,
-    userEmail: user.email,
-    status: "success", // Always success - we set the default flags
+    success: true,
     rulesUpdated,
-    scheduleCreated,
+    categoriesUpdated,
   };
 }
 
-async function rollbackUserMigration(userId: string): Promise<void> {
-  logger.info("Rolling back migration for user", { userId });
-
-  const user = await prisma.emailAccount.findUnique({
+/**
+ * Mark a user as having completed the digest migration
+ */
+async function markUserMigrated(userId: string): Promise<void> {
+  await prisma.emailAccount.update({
     where: { id: userId },
-    include: {
-      rules: {
-        include: { actions: true },
+    data: { digestMigrationCompleted: true },
+  } as any);
+}
+
+/**
+ * Rollback migration for a specific user (for testing/debugging)
+ */
+export async function rollbackUserMigration(userId: string): Promise<void> {
+  logger.info(`Rolling back migration for user ${userId}`);
+
+  // Find digest actions created during migration
+  const digestActions = await prisma.action.findMany({
+    where: {
+      type: ActionType.DIGEST,
+      rule: {
+        emailAccountId: userId,
+        name: { in: [...DEFAULT_DIGEST_CATEGORIES] },
       },
     },
   });
 
-  if (!user) {
-    throw new Error("User not found");
-  }
-
-  // Remove digest actions for all categories
-  for (const categoryType of ALL_DIGEST_CATEGORIES) {
-    const rule = user.rules.find((r) => r.systemType === categoryType);
-
-    if (rule) {
-      await prisma.action.deleteMany({
-        where: {
-          ruleId: rule.id,
-          type: ActionType.DIGEST,
-        },
-      });
-    }
-  }
-
-  // Mark user as not migrated and disable cold email digest
-  await prisma.emailAccount.update({
-    where: { id: userId },
-    data: {
-      digestMigrationCompleted: false,
-      coldEmailDigest: false,
+  // Delete the digest actions
+  await prisma.action.deleteMany({
+    where: {
+      id: { in: digestActions.map((a) => a.id) },
     },
   });
 
-  logger.info("Rollback completed", { userId });
+  // Mark user as not migrated
+  await prisma.emailAccount.update({
+    where: { id: userId },
+    data: { digestMigrationCompleted: false },
+  } as any);
+
+  logger.info(
+    `Rolled back ${digestActions.length} digest actions for user ${userId}`,
+  );
 }
 
-async function getMigrationStatus(): Promise<{
-  totalUsers: number;
-  migratedUsers: number;
-  pendingUsers: number;
-  migrationProgress: number;
-}> {
+/**
+ * Get migration status for all users
+ */
+export async function getMigrationStatus() {
   const totalUsers = await prisma.emailAccount.count();
   const migratedUsers = await prisma.emailAccount.count({
     where: { digestMigrationCompleted: true },
-  });
-
+  } as any);
   const pendingUsers = totalUsers - migratedUsers;
-  const migrationProgress =
-    totalUsers > 0 ? (migratedUsers / totalUsers) * 100 : 0;
 
   return {
     totalUsers,
     migratedUsers,
     pendingUsers,
-    migrationProgress,
+    migrationProgress: totalUsers > 0 ? (migratedUsers / totalUsers) * 100 : 0,
   };
 }
 
-async function verifyScheduleState() {
-  const users = await prisma.emailAccount.findMany({
-    where: { digestMigrationCompleted: true },
-    include: {
-      digestSchedules: true,
-      rules: {
-        where: {
-          actions: {
-            some: { type: ActionType.DIGEST },
-          },
-        },
-      },
-    },
-  });
-
-  return {
-    totalMigratedUsers: users.length,
-    usersWithSchedules: users.filter((u) => u.digestSchedules.length > 0)
-      .length,
-    usersWithoutSchedules: users.filter((u) => u.digestSchedules.length === 0)
-      .length,
-    usersWithMultipleSchedules: users.filter(
-      (u) => u.digestSchedules.length > 1,
-    ).length,
-    details: users.map((u) => ({
-      email: u.email,
-      scheduleCount: u.digestSchedules.length,
-      digestRules: u.rules.length,
-    })),
-  };
-}
-
-// CLI interface
-async function main() {
-  const args = process.argv.slice(2);
-  const command = args[0];
-  const dryRun = args.includes("--dry-run");
-
-  try {
-    switch (command) {
-      case "migrate": {
-        const result = await migrateUsersToDigestDefaults(dryRun);
-        console.log("Migration Results:", JSON.stringify(result, null, 2));
-        break;
-      }
-
-      case "status": {
-        const status = await getMigrationStatus();
-        console.log("Migration Status:", JSON.stringify(status, null, 2));
-        break;
-      }
-
-      case "rollback": {
-        const userId = args[1];
-        if (!userId) {
-          console.error("Usage: rollback <userId>");
-          process.exit(1);
-        }
-        await rollbackUserMigration(userId);
-        console.log("Rollback completed for user:", userId);
-        break;
-      }
-
-      case "verify-schedules": {
-        const verifyResult = await verifyScheduleState();
-        console.log(
-          "Schedule Verification:",
-          JSON.stringify(verifyResult, null, 2),
-        );
-        break;
-      }
-
-      default:
-        console.log(`
-Usage: tsx migrate-digest-defaults.ts <command> [options]
-
-Commands:
-  migrate [--dry-run]    Run migration (use --dry-run to test)
-  status                 Show migration status
-  verify-schedules       Verify schedule creation state
-  rollback <userId>      Rollback migration for specific user
-
-Examples:
-  tsx migrate-digest-defaults.ts migrate --dry-run
-  tsx migrate-digest-defaults.ts migrate
-  tsx migrate-digest-defaults.ts status
-  tsx migrate-digest-defaults.ts verify-schedules
-  tsx migrate-digest-defaults.ts rollback user123
-        `);
-    }
-  } catch (error) {
-    logger.error("Migration failed", { error });
-    console.error("Error:", error);
-    process.exit(1);
-  } finally {
-    await prisma.$disconnect();
-  }
-}
-
-// Run if called directly
+// CLI execution
 if (require.main === module) {
-  main();
+  migrateUsersToDigestDefaults()
+    .then((stats) => {
+      console.log("Migration completed successfully:", stats);
+      process.exit(0);
+    })
+    .catch((error) => {
+      console.error("Migration failed:", error);
+      process.exit(1);
+    })
+    .finally(() => {
+      prisma.$disconnect();
+    });
 }
-
-export {
-  migrateUsersToDigestDefaults,
-  rollbackUserMigration,
-  getMigrationStatus,
-};

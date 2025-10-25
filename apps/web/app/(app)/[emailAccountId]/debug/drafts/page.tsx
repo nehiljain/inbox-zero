@@ -43,7 +43,12 @@ export default function DebugDraftsPage() {
     <div className="container mx-auto py-6">
       <PageHeading className="mb-6">Drafts</PageHeading>
 
-      <LoadingContent loading={isLoading} error={error}>
+      <LoadingContent
+        loading={isLoading}
+        error={
+          error as { error?: string; info?: { error: string } } | undefined
+        }
+      >
         {data?.executedActions.length === 0 ? (
           <Card>
             <CardContent className="flex items-center justify-center p-6">

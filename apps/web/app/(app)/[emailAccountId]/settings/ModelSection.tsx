@@ -41,7 +41,12 @@ export function ModelSection() {
         description="Use the default model at no cost, or choose a custom model with your own API key."
       />
 
-      <LoadingContent loading={isLoading || isLoadingModels} error={error}>
+      <LoadingContent
+        loading={isLoading || isLoadingModels}
+        error={
+          error as { error?: string; info?: { error: string } } | undefined
+        }
+      >
         {data && (
           <ModelSectionForm
             aiProvider={data.aiProvider}

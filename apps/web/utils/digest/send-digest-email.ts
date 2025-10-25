@@ -242,6 +242,7 @@ export async function sendEmail({
     await sendDigestEmail({
       from: env.RESEND_FROM_EMAIL,
       to: emailAccount.email,
+      test: testMode, // Use test mode for digest tester
       emailProps: {
         baseUrl: env.NEXT_PUBLIC_BASE_URL,
         unsubscribeToken: token,

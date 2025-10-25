@@ -70,7 +70,10 @@ export default function Pricing(props: PricingProps) {
   const router = useRouter();
 
   return (
-    <LoadingContent loading={isLoading} error={error}>
+    <LoadingContent
+      loading={isLoading}
+      error={error as { error?: string; info?: { error: string } } | undefined}
+    >
       <div
         id="pricing"
         className={cn(

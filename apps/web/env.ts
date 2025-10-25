@@ -101,7 +101,7 @@ export const env = createEnv({
     RESEND_FROM_EMAIL: z
       .string()
       .optional()
-      .default("Inbox Zero <updates@transactional.getinboxzero.com>"),
+      .default("Inbox Zero <updates@dossier.demodrive.tech>"),
     CRON_SECRET: z.string().optional(),
     LOOPS_API_SECRET: z.string().optional(),
     FB_CONVERSION_API_ACCESS_TOKEN: z.string().optional(),
@@ -240,4 +240,5 @@ export const env = createEnv({
       process.env.NEXT_PUBLIC_DISABLE_REFERRAL_SIGNATURE,
   },
   emptyStringAsUndefined: true,
+  skipValidation: !!process.env.SKIP_ENV_VALIDATION,
 });
