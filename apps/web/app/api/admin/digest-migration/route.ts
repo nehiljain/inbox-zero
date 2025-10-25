@@ -17,11 +17,14 @@ export const GET = withError(async (request: NextRequest) => {
   try {
     const result = await runDigestMigrationAction({ dryRun });
 
-    if (result.success) {
-      return NextResponse.json(result);
+    if (result?.data?.success) {
+      return NextResponse.json(result.data);
     } else {
       return NextResponse.json(
-        { error: result.error, message: result.message },
+        {
+          error: result?.data?.error || result?.serverError,
+          message: result?.data?.message,
+        },
         { status: 500 },
       );
     }
@@ -46,11 +49,14 @@ export const POST = withError(async (request: NextRequest) => {
   try {
     const result = await runDigestMigrationAction({ dryRun });
 
-    if (result.success) {
-      return NextResponse.json(result);
+    if (result?.data?.success) {
+      return NextResponse.json(result.data);
     } else {
       return NextResponse.json(
-        { error: result.error, message: result.message },
+        {
+          error: result?.data?.error || result?.serverError,
+          message: result?.data?.message,
+        },
         { status: 500 },
       );
     }
@@ -73,10 +79,13 @@ export const PUT = withError(async () => {
   try {
     const result = await getDigestMigrationStatusAction({});
 
-    if (result.success) {
-      return NextResponse.json(result);
+    if (result?.data?.success) {
+      return NextResponse.json(result.data);
     } else {
-      return NextResponse.json({ error: result.error }, { status: 500 });
+      return NextResponse.json(
+        { error: result?.data?.error || result?.serverError },
+        { status: 500 },
+      );
     }
   } catch (error) {
     logger.error("Status API failed", { error });

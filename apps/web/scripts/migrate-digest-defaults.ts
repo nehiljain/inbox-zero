@@ -148,7 +148,7 @@ async function migrateUserDigestDefaults(user: {
   rules: Array<{
     id: string;
     name: string;
-    systemType: SystemRule | null;
+    systemType: SystemType | null;
     actions: Array<{ type: ActionType }>;
   }>;
 }): Promise<UserMigrationResult> {
