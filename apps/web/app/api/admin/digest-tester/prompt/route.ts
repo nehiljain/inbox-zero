@@ -33,7 +33,7 @@ export const GET = withError(async (_request) => {
       content = await fs.readFile(testPath, "utf-8");
       filePath = testPath;
       break;
-    } catch (error) {
+    } catch (_error) {
       // Continue to next path
     }
   }
