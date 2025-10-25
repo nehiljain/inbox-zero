@@ -6,7 +6,6 @@ import { usePostHog } from "posthog-js/react";
 import { ArrowRightIcon, SparklesIcon } from "lucide-react";
 import { PageHeading, TypographyP } from "@/components/Typography";
 import { Button } from "@/components/ui/button";
-import { env } from "@/env";
 import { completedOnboardingAction } from "@/utils/actions/onboarding";
 
 interface PreviewBriefContentProps {
@@ -30,7 +29,7 @@ export function PreviewBriefContent({ userName }: PreviewBriefContentProps) {
 
     // Redirect directly to app home (skipping welcome survey and upgrade for now)
     // TODO: Re-enable welcome survey flow later: router.push("/welcome");
-    router.push(env.NEXT_PUBLIC_APP_HOME_PATH);
+    router.push("/setup");
   };
 
   return (
