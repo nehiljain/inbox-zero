@@ -14,7 +14,7 @@ export const GET = withError(async (_request) => {
   // Read prompt from production file
   const filePath = path.join(
     process.cwd(),
-    "utils/ai/digest/summarize-email-for-digest.ts",
+    "apps/web/utils/ai/digest/summarize-email-for-digest.ts",
   );
 
   const content = await fs.readFile(filePath, "utf-8");
@@ -35,7 +35,7 @@ export const GET = withError(async (_request) => {
 
   return NextResponse.json({
     prompt,
-    file: "utils/ai/digest/summarize-email-for-digest.ts",
+    file: "apps/web/utils/ai/digest/summarize-email-for-digest.ts",
   });
 });
 
