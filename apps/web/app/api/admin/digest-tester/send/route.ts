@@ -18,18 +18,19 @@ export const POST = withError(async (request) => {
   const body = schema.parse(await request.json());
   const { emailAccountId } = body;
 
-  // Call PRODUCTION sendEmail() function directly with force=true and testMode=true
+  // Call PRODUCTION sendEmail() function directly with force=true and testMode=false
   // This uses the EXACT same sendEmail() function as production cron
-  // testMode=true keeps digests as PENDING so preview remains visible
+  // testMode=false sends emails to actual recipient and marks digests as SENT
   const result = await sendEmail({
     emailAccountId,
     force: true, // Force send even if schedule says not ready
-    testMode: true, // Keep digests as PENDING for preview
+    testMode: false, // Send to actual recipient
   });
 
   return NextResponse.json({
     success: true,
-    message: "Digest sent via production sendEmail() function",
+    message:
+      "Digest sent to actual recipient via production sendEmail() function",
     result,
   });
 });
