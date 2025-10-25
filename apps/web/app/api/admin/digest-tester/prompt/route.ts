@@ -23,17 +23,30 @@ export const GET = withError(async (_request) => {
       process.cwd(),
       "apps/web/apps/web/utils/ai/digest/summarize-email-for-digest.ts",
     ),
+    path.join(
+      process.cwd(),
+      "apps/web/apps/web/apps/web/utils/ai/digest/summarize-email-for-digest.ts",
+    ),
+    "/var/task/apps/web/utils/ai/digest/summarize-email-for-digest.ts",
+    "/var/task/utils/ai/digest/summarize-email-for-digest.ts",
   ];
 
   let content = "";
   let filePath = "";
 
+  console.log(
+    `Trying to find file. Current working directory: ${process.cwd()}`,
+  );
+  console.log("Possible paths:", possiblePaths);
+
   for (const testPath of possiblePaths) {
     try {
       content = await fs.readFile(testPath, "utf-8");
       filePath = testPath;
+      console.log(`Found file at: ${testPath}`);
       break;
     } catch (_error) {
+      console.log(`File not found at: ${testPath}`);
       // Continue to next path
     }
   }
