@@ -72,6 +72,7 @@
 
         "RESEND_API_KEY",
         "RESEND_AUDIENCE_ID",
+        "RESEND_FROM_EMAIL",
 
         "LOOPS_API_SECRET",
 
